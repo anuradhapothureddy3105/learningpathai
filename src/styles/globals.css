@@ -1,0 +1,74 @@
+@import './variables.css';
+@import './animations.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--parchment);
+  color: var(--ink);
+  margin: 0;
+  padding: 0;
+}
+
+.font-display {
+  font-family: 'Baloo 2', 'Noto Sans Telugu', sans-serif;
+}
+
+.font-te {
+  font-family: 'Noto Sans Telugu', 'Inter', sans-serif;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D8CFB8;
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #C4B99D;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Specific Background Styles */
+.bg-night {
+  background-color: var(--night);
+}
+
+.bg-noise {
+  background-image: radial-gradient(circle at 20% 20%, rgba(232, 163, 61, 0.10), transparent 40%),
+                    radial-gradient(circle at 80% 0%, rgba(31, 122, 108, 0.12), transparent 45%);
+}
+
+.grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+}
+
+textarea:focus,
+input:focus {
+  outline: none;
+}

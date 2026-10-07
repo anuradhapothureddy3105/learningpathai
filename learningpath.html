@@ -1,0 +1,1750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>Sky Route — AI Learning Path</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Telugu:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.3/css/bootstrap.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<style>
+  :root{
+    --ink:#141A2E;
+    --night:#101528;
+    --night-2:#1B233F;
+    --parchment:#FBF7EE;
+    --parchment-2:#F3ECDB;
+    --marigold:#E8A33D;
+    --marigold-deep:#C97F1F;
+    --teal:#1F7A6C;
+    --teal-deep:#155A50;
+    --coral:#E2574C;
+    --muted:#7A8199;
+    --indigo:#4A4E9E;
+    --steel:#4C7A9E;
+    --clay:#A9652E;
+  }
+  *{-webkit-tap-highlight-color:transparent;}
+  body{font-family:'Inter',sans-serif; background:var(--parchment); color:var(--ink);}
+  .font-display{font-family:'Baloo 2', 'Noto Sans Telugu', sans-serif;}
+  .font-te{font-family:'Noto Sans Telugu','Inter',sans-serif;}
+  ::-webkit-scrollbar{width:8px; height:8px;}
+  ::-webkit-scrollbar-thumb{background:#D8CFB8; border-radius:8px;}
+  .bg-night{background:var(--night);}
+  .bg-noise{
+    background-image: radial-gradient(circle at 20% 20%, rgba(232,163,61,0.10), transparent 40%),
+                       radial-gradient(circle at 80% 0%, rgba(31,122,108,0.12), transparent 45%);
+  }
+  .path-glow{filter: drop-shadow(0 0 10px rgba(232,163,61,0.45));}
+  .fade-in{animation: fadeIn .5s ease both;}
+  @keyframes fadeIn{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);}}
+  .pulse-ring{animation: pulseRing 2.2s ease-out infinite;}
+  @keyframes pulseRing{0%{box-shadow:0 0 0 0 rgba(232,163,61,0.45);}70%{box-shadow:0 0 0 14px rgba(232,163,61,0);}100%{box-shadow:0 0 0 0 rgba(232,163,61,0);}}
+  .mic-active{animation: micPulse 1s ease-in-out infinite;}
+  @keyframes micPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.12);}}
+  .scrollbar-none::-webkit-scrollbar{display:none;}
+  .scrollbar-none{-ms-overflow-style:none; scrollbar-width:none;}
+  textarea:focus, input:focus{outline:none;}
+  .grain{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");}
+  .card-hover{transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;}
+  .card-hover:hover{transform: translateY(-3px); box-shadow: 0 14px 30px rgba(20,26,46,0.10);}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const {useState, useEffect, useRef, useMemo, useCallback} = React;
+
+/* ---------------------------------------------------------------------- */
+/*  SAFE STORAGE                                                          */
+/*  window.storage only exists inside the Claude.ai artifact preview.     */
+/*  Once this file is downloaded and opened as a normal page (or hosted   */
+/*  anywhere else), window.storage is undefined — calling it directly     */
+/*  throws immediately and silently breaks buttons like "Build my path"   */
+/*  (the screen-change line right after the storage call never runs).     */
+/*  This wrapper falls back to localStorage so the app works everywhere.  */
+/* ---------------------------------------------------------------------- */
+const safeStorage = {
+  async get(key) {
+    try {
+      if (window.storage && typeof window.storage.get === "function") {
+        return await window.storage.get(key);
+      }
+    } catch (e) { /* fall through to localStorage */ }
+    try {
+      const v = localStorage.getItem(key);
+      return v === null ? null : { key, value: v };
+    } catch (e) { return null; }
+  },
+  async set(key, value) {
+    try {
+      if (window.storage && typeof window.storage.set === "function") {
+        return await window.storage.set(key, value);
+      }
+    } catch (e) { /* fall through to localStorage */ }
+    try { localStorage.setItem(key, value); } catch (e) { /* ignore */ }
+    return null;
+  },
+  async delete(key) {
+    try {
+      if (window.storage && typeof window.storage.delete === "function") {
+        return await window.storage.delete(key);
+      }
+    } catch (e) { /* fall through to localStorage */ }
+    try { localStorage.removeItem(key); } catch (e) { /* ignore */ }
+    return null;
+  }
+};
+
+/* ---------------------------------------------------------------------- */
+/*  TRANSLATIONS                                                          */
+/* ---------------------------------------------------------------------- */
+const T = {
+  en: {
+    brand: "Sky Route", brandSub: "AI Learning Path",
+    heroTitle: "Confused about your career? Let's find your path.",
+    heroSub: "A calm, step-by-step learning companion for SITE students — built for slow networks, built for you.",
+    getStarted: "Get Started", signIn: "Sign In",
+    heroPoint1: "Works on slow internet",
+    heroPoint2: "Telugu + English, your choice",
+    heroPoint3: "An AI friend that remembers you",
+    trust: "Built with SASI IDEA Lab · Tadepalligudem",
+    exploreCta: "Explore all career paths",
+    exploreCtaSub: "13 paths across BTech & MTech — no sign-in needed to browse.",
+    authTitle: "Sign in to Sky Route",
+    authSub: "No passwords to remember. Just your phone number.",
+    phoneLabel: "Mobile number",
+    phonePlaceholder: "10-digit number",
+    sendOtp: "Send OTP",
+    otpLabel: "Enter the 6-digit code",
+    otpSub: "We sent a code to",
+    verify: "Verify & Continue",
+    otpHint: "(Demo: type any 6 digits)",
+    back: "Back",
+    obTitle: "Let's build your path",
+    obSub: "A few quick questions. This helps your AI mentor plan every step for you.",
+    obStep: "Step",
+    obNameQ: "What should we call you?",
+    obNamePlaceholder: "Your name",
+    obCareerQ: "What do you want to become?",
+    obCareerSub: "Browse every path below — grouped by branch. Tap a card to pick it, or open it for full details first.",
+    obPathConfirmed: "You picked this path from Explore",
+    obChangePath: "Change path",
+    obLevelQ: "How confident are you right now?",
+    levelBeginner: "Beginner — just starting out",
+    levelIntermediate: "Intermediate — know the basics",
+    levelAdvanced: "Advanced — ready for real projects",
+    obHoursQ: "How many hours can you give per week?",
+    obHoursSub: "Be honest — we'll pace your path to fit your life.",
+    continueBtn: "Continue",
+    finishBtn: "Build my path",
+    dashGreeting: "Welcome back",
+    dashSub: "Here is your path. One step at a time — no rush.",
+    yourPath: "Your career path",
+    weekHours: "hrs/week",
+    progress: "Progress",
+    nodesDone: "steps done",
+    weeklyCheck: "Weekly check-in ready",
+    weeklyCheckSub: "Test what you've learned so far — takes 5 minutes.",
+    startQuiz: "Start weekly check-in",
+    statusDone: "Done",
+    statusAvailable: "Continue",
+    statusLocked: "Locked",
+    remedialTag: "Extra help",
+    openResource: "Open lesson",
+    markComplete: "Mark as complete",
+    completed: "Completed ✓",
+    closeModal: "Close",
+    quizTitle: "Weekly check-in",
+    quizSub: "Answer honestly — this tells your path what to do next.",
+    submitQuiz: "Submit answers",
+    quizResultPassTitle: "Well done!",
+    quizResultPassSub: "You're solid on this. Moving you forward on your path.",
+    quizResultFailTitle: "No stress — let's fix this together.",
+    quizResultFailSub: "We found a gap. Your AI mentor is preparing a short catch-up lesson and adding it to your path.",
+    generatingHelp: "Preparing your catch-up lesson…",
+    continueDash: "Back to my path",
+    chatTitle: "Your AI Mentor",
+    chatSub: "Knows what you're studying. Ask in Telugu, English, or both.",
+    chatPlaceholder: "Type or speak your question…",
+    chatContext: "Currently on:",
+    chatEmpty: "Ask me anything about what you're learning — I remember your progress.",
+    micUnsupported: "Voice input isn't supported in this browser. Try Chrome.",
+    listening: "Listening…",
+    offlineBadge: "Cached for offline use",
+    footerTag: "Made for students who deserve clarity, not confusion.",
+    send: "Send",
+    thinking: "Thinking…",
+    resourceExternalNote: "This opens on an external site. Come back and mark it complete when you're done.",
+    signOut: "Sign out",
+    explorePaths: "Explore paths",
+    exploreTitle: "Every path, explained",
+    exploreSub: "BTech and MTech, branch by branch. No confusion — just clear next steps and honest numbers.",
+    filterAll: "All", filterBtech: "BTech", filterMtech: "MTech",
+    viewDetails: "View full details",
+    choosePath: "Choose this path",
+    salaryLabel: "Typical starting salary",
+    timelineLabel: "Realistic timeline",
+    skillsLabel: "Core skills you'll build",
+    recruitersLabel: "Who hires this",
+    rolesLabel: "Job titles you're aiming for",
+    backToExplore: "Back to all paths",
+    pathsCount: "paths",
+  },
+  te: {
+    brand: "స్కై రూట్", brandSub: "AI లెర్నింగ్ పాత్",
+    heroTitle: "మీ కెరీర్ గురించి గందరగోళంగా ఉందా? మీ దారిని కనుక్కుందాం.",
+    heroSub: "SITE విద్యార్థుల కోసం ప్రశాంతమైన, అడుగడుగునా సాగే లెర్నింగ్ తోడు — నెమ్మదైన నెట్‌వర్క్‌ల కోసం, మీ కోసం తయారు చేయబడింది.",
+    getStarted: "ప్రారంభించండి", signIn: "సైన్ ఇన్",
+    heroPoint1: "నెమ్మదైన ఇంటర్నెట్‌లో కూడా పనిచేస్తుంది",
+    heroPoint2: "తెలుగు + ఇంగ్లీష్, మీ ఇష్టం",
+    heroPoint3: "మిమ్మల్ని గుర్తుంచుకునే AI స్నేహితుడు",
+    trust: "SASI IDEA Lab · తాడేపల్లిగూడెం తో రూపొందించబడింది",
+    exploreCta: "అన్ని కెరీర్ దారులు చూడండి",
+    exploreCtaSub: "BTech & MTech లో 13 దారులు — బ్రౌజ్ చేయడానికి సైన్-ఇన్ అవసరం లేదు.",
+    authTitle: "స్కై రూట్ లోకి సైన్ ఇన్ అవ్వండి",
+    authSub: "పాస్‌వర్డ్‌లు గుర్తుంచుకోవాల్సిన అవసరం లేదు. మీ ఫోన్ నంబర్ చాలు.",
+    phoneLabel: "మొబైల్ నంబర్",
+    phonePlaceholder: "10 అంకెల నంబర్",
+    sendOtp: "OTP పంపండి",
+    otpLabel: "6 అంకెల కోడ్ నమోదు చేయండి",
+    otpSub: "కోడ్ పంపబడింది",
+    verify: "ధృవీకరించి కొనసాగించండి",
+    otpHint: "(డెమో: ఏవైనా 6 అంకెలు టైప్ చేయండి)",
+    back: "వెనుకకు",
+    obTitle: "మీ దారిని నిర్మిద్దాం",
+    obSub: "కొన్ని చిన్న ప్రశ్నలు. ఇవి మీ AI మెంటార్‌కి ప్రతి అడుగును ప్లాన్ చేయడంలో సహాయపడతాయి.",
+    obStep: "దశ",
+    obNameQ: "మిమ్మల్ని ఏమని పిలవాలి?",
+    obNamePlaceholder: "మీ పేరు",
+    obCareerQ: "మీరు ఏమి కావాలనుకుంటున్నారు?",
+    obCareerSub: "కింద ఉన్న ప్రతి దారిని బ్రాంచ్ వారీగా బ్రౌజ్ చేయండి. ఎంచుకోవడానికి కార్డ్‌ను నొక్కండి, లేదా ముందు పూర్తి వివరాలు చూడండి.",
+    obPathConfirmed: "మీరు Explore నుండి ఈ దారిని ఎంచుకున్నారు",
+    obChangePath: "దారిని మార్చండి",
+    obLevelQ: "ప్రస్తుతం మీకు ఎంత నమ్మకం ఉంది?",
+    levelBeginner: "బిగినర్ — ఇప్పుడే మొదలుపెడుతున్నాను",
+    levelIntermediate: "ఇంటర్మీడియట్ — బేసిక్స్ తెలుసు",
+    levelAdvanced: "అడ్వాన్స్‌డ్ — నిజమైన ప్రాజెక్ట్‌లకు సిద్ధం",
+    obHoursQ: "వారానికి ఎన్ని గంటలు ఇవ్వగలరు?",
+    obHoursSub: "నిజాయితీగా చెప్పండి — మీ జీవితానికి సరిపోయేలా దారిని అమరుస్తాము.",
+    continueBtn: "కొనసాగించండి",
+    finishBtn: "నా దారిని నిర్మించండి",
+    dashGreeting: "తిరిగి స్వాగతం",
+    dashSub: "ఇదిగో మీ దారి. తొందర లేదు — ఒక్కో అడుగు వేద్దాం.",
+    yourPath: "మీ కెరీర్ దారి",
+    weekHours: "గం/వారం",
+    progress: "పురోగతి",
+    nodesDone: "దశలు పూర్తయ్యాయి",
+    weeklyCheck: "వారపు చెక్-ఇన్ సిద్ధంగా ఉంది",
+    weeklyCheckSub: "ఇప్పటివరకు నేర్చుకున్నది పరీక్షించండి — 5 నిమిషాలు పడుతుంది.",
+    startQuiz: "వారపు చెక్-ఇన్ ప్రారంభించండి",
+    statusDone: "పూర్తయింది",
+    statusAvailable: "కొనసాగించండి",
+    statusLocked: "లాక్ చేయబడింది",
+    remedialTag: "అదనపు సహాయం",
+    openResource: "పాఠం తెరవండి",
+    markComplete: "పూర్తయినట్లు గుర్తించండి",
+    completed: "పూర్తయింది ✓",
+    closeModal: "మూసివేయండి",
+    quizTitle: "వారపు చెక్-ఇన్",
+    quizSub: "నిజాయితీగా సమాధానం ఇవ్వండి — ఇది మీ దారి తదుపరి ఏం చేయాలో చెబుతుంది.",
+    submitQuiz: "సమాధానాలు సమర్పించండి",
+    quizResultPassTitle: "బాగా చేశారు!",
+    quizResultPassSub: "మీకు ఇది బాగా తెలుసు. మిమ్మల్ని దారిలో ముందుకు తీసుకెళ్తున్నాం.",
+    quizResultFailTitle: "టెన్షన్ లేదు — కలిసి సరిచేద్దాం.",
+    quizResultFailSub: "ఒక గ్యాప్ కనిపించింది. మీ AI మెంటార్ ఒక చిన్న క్యాచ్-అప్ పాఠాన్ని సిద్ధం చేసి మీ దారికి జోడిస్తోంది.",
+    generatingHelp: "మీ క్యాచ్-అప్ పాఠాన్ని సిద్ధం చేస్తోంది…",
+    continueDash: "నా దారికి తిరిగి వెళ్ళండి",
+    chatTitle: "మీ AI మెంటార్",
+    chatSub: "మీరు ఏమి చదువుతున్నారో తెలుసు. తెలుగులో, ఇంగ్లీష్‌లో లేదా రెండింటిలో అడగండి.",
+    chatPlaceholder: "మీ ప్రశ్నను టైప్ చేయండి లేదా మాట్లాడండి…",
+    chatContext: "ప్రస్తుతం చదువుతున్నది:",
+    chatEmpty: "మీరు నేర్చుకుంటున్న దాని గురించి ఏదైనా అడగండి — మీ పురోగతి నాకు గుర్తుంది.",
+    micUnsupported: "ఈ బ్రౌజర్‌లో వాయిస్ ఇన్‌పుట్ సపోర్ట్ లేదు. Chrome ప్రయత్నించండి.",
+    listening: "వింటున్నాను…",
+    offlineBadge: "ఆఫ్‌లైన్ వాడకానికి సేవ్ చేయబడింది",
+    footerTag: "గందరగోళం కాదు, స్పష్టత కావాలనుకునే విద్యార్థుల కోసం రూపొందించబడింది.",
+    send: "పంపండి",
+    thinking: "ఆలోచిస్తోంది…",
+    resourceExternalNote: "ఇది ఒక బాహ్య సైట్‌లో తెరుచుకుంటుంది. పూర్తయ్యాక తిరిగి వచ్చి పూర్తయినట్లు గుర్తించండి.",
+    signOut: "సైన్ అవుట్",
+    explorePaths: "దారులు చూడండి",
+    exploreTitle: "ప్రతి దారి, వివరంగా",
+    exploreSub: "BTech మరియు MTech, బ్రాంచ్ వారీగా. గందరగోళం వద్దు — స్పష్టమైన తదుపరి అడుగులు, నిజాయితీ గల సంఖ్యలు మాత్రమే.",
+    filterAll: "అన్నీ", filterBtech: "BTech", filterMtech: "MTech",
+    viewDetails: "పూర్తి వివరాలు చూడండి",
+    choosePath: "ఈ దారిని ఎంచుకోండి",
+    salaryLabel: "సాధారణ ప్రారంభ జీతం",
+    timelineLabel: "వాస్తవిక కాలవ్యవధి",
+    skillsLabel: "మీరు నేర్చుకునే ప్రధాన నైపుణ్యాలు",
+    recruitersLabel: "దీన్ని ఎవరు నియమిస్తారు",
+    rolesLabel: "మీరు లక్ష్యంగా పెట్టుకునే ఉద్యోగ శీర్షికలు",
+    backToExplore: "అన్ని దారులకు తిరిగి",
+    pathsCount: "దారులు",
+  }
+};
+
+/* ---------------------------------------------------------------------- */
+/*  BRANCH THEME COLORS                                                   */
+/* ---------------------------------------------------------------------- */
+const BRANCH_THEME = {
+  cse: {color:"var(--teal)", deep:"var(--teal-deep)", icon:"💻", en:"CSE / IT", te:"CSE / IT"},
+  ece: {color:"var(--marigold)", deep:"var(--marigold-deep)", icon:"📡", en:"ECE", te:"ECE"},
+  eee: {color:"var(--coral)", deep:"#B93F35", icon:"⚡", en:"EEE", te:"EEE"},
+  mech:{color:"var(--steel)", deep:"#365E7A", icon:"⚙️", en:"Mechanical", te:"మెకానికల్"},
+  civil:{color:"var(--clay)", deep:"#814D22", icon:"🏗️", en:"Civil", te:"సివిల్"},
+  core:{color:"var(--muted)", deep:"#585F78", icon:"🎯", en:"Any Branch", te:"ఏ బ్రాంచ్ అయినా"},
+  mtech:{color:"var(--indigo)", deep:"#33357A", icon:"🔬", en:"MTech", te:"MTech"},
+};
+
+/* ---------------------------------------------------------------------- */
+/*  PATH LIBRARY — every path, BTech + MTech                              */
+/* ---------------------------------------------------------------------- */
+const PATHS = {
+
+  "cse-ds": {
+    degree:"btech", branch:"cse",
+    title_en:"Data Scientist", title_te:"డేటా సైంటిస్ట్",
+    tagline_en:"Turn raw data into decisions.", tagline_te:"ముడి డేటాను నిర్ణయాలుగా మార్చండి.",
+    desc_en:"You'll learn to clean messy data, find patterns, and build models that predict outcomes — from crop yields to customer behaviour. A strong fit if you enjoy maths and asking 'why' about numbers.",
+    desc_te:"గజిబిజి డేటాను శుభ్రం చేయడం, ప్యాటర్న్‌లు కనుగొనడం, పంట దిగుబడి నుండి కస్టమర్ ప్రవర్తన వరకు ఫలితాలను అంచనా వేసే మోడళ్లను నిర్మించడం నేర్చుకుంటారు. మీకు గణితం ఇష్టమైతే, సంఖ్యల గురించి 'ఎందుకు' అని అడగడం ఇష్టమైతే ఇది సరైన దారి.",
+    timeline_en:"6–9 months of focused study", timeline_te:"6–9 నెలల ఫోకస్డ్ స్టడీ",
+    salary_en:"₹4.5–9 LPA to start", salary_te:"₹4.5–9 LPA ప్రారంభంలో",
+    roles:["Data Analyst","Junior Data Scientist","ML Engineer (entry)"],
+    recruiters:["TCS Digital","Infosys","Deloitte Analytics","product startups"],
+    skills:["Python","Statistics","Pandas/NumPy","SQL","ML basics"],
+    nodes: [
+      {id:"ds1", title_en:"Python Foundations", title_te:"పైథాన్ పునాదులు", type:"external", link:"https://www.freecodecamp.org/learn/scientific-computing-with-python/", desc_en:"Variables, loops, functions — the building blocks of every data script you'll ever write.", desc_te:"వేరియబుల్స్, లూప్‌లు, ఫంక్షన్లు — మీరు రాసే ప్రతి డేటా స్క్రిప్ట్‌కు ఇవే పునాదులు."},
+      {id:"ds2", title_en:"Statistics & Probability", title_te:"గణాంకాలు & సంభావ్యత", type:"external", link:"https://www.khanacademy.org/math/statistics-probability", desc_en:"Mean, variance, distributions — how data scientists reason about uncertainty.", desc_te:"సగటు, వేరియన్స్, డిస్ట్రిబ్యూషన్‌లు — డేటా సైంటిస్టులు అనిశ్చితిని ఎలా అర్థం చేసుకుంటారో."},
+      {id:"ds3", title_en:"Pandas & NumPy", title_te:"పాండాస్ & నంపై", type:"internal", desc_en:"Load, clean and slice real datasets in Python — the daily tool of every DS role.", desc_te:"పైథాన్‌లో నిజమైన డేటాసెట్‌లను లోడ్ చేయడం, శుభ్రం చేయడం, స్లైస్ చేయడం — ప్రతి DS పాత్రలో రోజువారీ సాధనం."},
+      {id:"ds4", title_en:"SQL for Data", title_te:"డేటా కోసం SQL", type:"external", link:"https://www.hackerrank.com/domains/sql", desc_en:"Query databases with confidence — SELECT, JOIN, GROUP BY and beyond.", desc_te:"డేటాబేస్‌లను నమ్మకంగా క్వరీ చేయండి — SELECT, JOIN, GROUP BY మరియు ఇంకా ఎన్నో."},
+      {id:"ds5", title_en:"Machine Learning Foundations", title_te:"మెషిన్ లెర్నింగ్ పునాదులు", type:"internal", desc_en:"Regression, classification, and how a model actually 'learns' from data.", desc_te:"రిగ్రెషన్, క్లాసిఫికేషన్, మరియు ఒక మోడల్ డేటా నుండి ఎలా 'నేర్చుకుంటుంది'."},
+      {id:"ds6", title_en:"EDA Mini Project", title_te:"EDA మినీ ప్రాజెక్ట్", type:"internal", desc_en:"Analyse a real West Godavari agriculture dataset end-to-end for your portfolio.", desc_te:"మీ పోర్ట్‌ఫోలియో కోసం నిజమైన పశ్చిమ గోదావరి వ్యవసాయ డేటాసెట్‌ను పూర్తిగా విశ్లేషించండి."},
+      {id:"ds7", title_en:"Deep Learning Intro", title_te:"డీప్ లెర్నింగ్ పరిచయం", type:"external", link:"https://www.deeplearning.ai/short-courses/", desc_en:"Neural networks explained simply — no heavy maths required to start.", desc_te:"న్యూరల్ నెట్‌వర్క్‌లు సరళంగా వివరించబడ్డాయి — మొదలుపెట్టడానికి భారీ గణితం అవసరం లేదు."},
+      {id:"ds8", title_en:"Resume & Portfolio", title_te:"రెజ్యూమ్ & పోర్ట్‌ఫోలియో", type:"internal", desc_en:"Turn your projects into a resume placement teams actually notice.", desc_te:"మీ ప్రాజెక్టులను ప్లేస్‌మెంట్ టీమ్‌లు గమనించే రెజ్యూమ్‌గా మార్చండి."},
+    ]
+  },
+
+  "cse-fs": {
+    degree:"btech", branch:"cse",
+    title_en:"Full-Stack Developer", title_te:"ఫుల్-స్టాక్ డెవలపర్",
+    tagline_en:"Build the websites and apps people use every day.", tagline_te:"ప్రజలు ప్రతిరోజూ వాడే వెబ్‌సైట్లు, యాప్‌లను నిర్మించండి.",
+    desc_en:"You'll learn both sides of an application — the part users see (frontend) and the part that powers it behind the scenes (backend). Great if you like building things you can show off immediately.",
+    desc_te:"ఒక అప్లికేషన్‌లో రెండు వైపులా — యూజర్లు చూసేది (ఫ్రంటెండ్) మరియు దాన్ని వెనుక నుండి నడిపేది (బ్యాకెండ్) — నేర్చుకుంటారు. వెంటనే చూపించగలిగే వాటిని నిర్మించడం ఇష్టమైతే ఇది సరైన దారి.",
+    timeline_en:"6–10 months of focused study", timeline_te:"6–10 నెలల ఫోకస్డ్ స్టడీ",
+    salary_en:"₹4–8 LPA to start", salary_te:"₹4–8 LPA ప్రారంభంలో",
+    roles:["Frontend Developer","Backend Developer","Full-Stack Engineer (entry)"],
+    recruiters:["service companies","product startups","freelance clients"],
+    skills:["HTML/CSS/JS","React","Node.js","Databases","Git"],
+    nodes: [
+      {id:"fs1", title_en:"HTML, CSS & JS Basics", title_te:"HTML, CSS & JS బేసిక్స్", type:"external", link:"https://www.freecodecamp.org/learn/2022/responsive-web-design/", desc_en:"The three languages every website is built from.", desc_te:"ప్రతి వెబ్‌సైట్ నిర్మించబడే మూడు భాషలు."},
+      {id:"fs2", title_en:"Git & GitHub", title_te:"Git & GitHub", type:"external", link:"https://docs.github.com/en/get-started/quickstart/hello-world", desc_en:"Save your work, undo mistakes, and collaborate like a real engineer.", desc_te:"మీ పనిని సేవ్ చేయండి, తప్పులను వెనక్కి తీసుకోండి, నిజమైన ఇంజనీర్‌లా సహకరించండి."},
+      {id:"fs3", title_en:"Arrays & Strings (DSA)", title_te:"అర్రేలు & స్ట్రింగ్‌లు (DSA)", type:"external", link:"https://leetcode.com/tag/array/", desc_en:"The most-asked interview topic — build pattern recognition here.", desc_te:"ఇంటర్వ్యూలో ఎక్కువగా అడిగే టాపిక్ — ఇక్కడ ప్యాటర్న్ గుర్తింపును పెంచుకోండి."},
+      {id:"fs4", title_en:"React Basics", title_te:"React బేసిక్స్", type:"internal", desc_en:"Components, props and state — how modern websites are actually built.", desc_te:"కాంపొనెంట్‌లు, ప్రాప్‌లు, స్టేట్ — ఆధునిక వెబ్‌సైట్‌లు ఎలా నిర్మించబడతాయో."},
+      {id:"fs5", title_en:"Node & Express", title_te:"Node & Express", type:"internal", desc_en:"Build the server that powers your app behind the scenes.", desc_te:"మీ యాప్‌ను వెనుక నుండి నడిపే సర్వర్‌ను నిర్మించండి."},
+      {id:"fs6", title_en:"Databases (SQL & NoSQL)", title_te:"డేటాబేస్‌లు (SQL & NoSQL)", type:"external", link:"https://www.mongodb.com/docs/manual/tutorial/getting-started/", desc_en:"Store and retrieve data reliably — the backbone of any real app.", desc_te:"డేటాను నమ్మకంగా నిల్వ చేయడం, తిరిగి పొందడం — ఏ నిజమైన యాప్‌కైనా వెన్నెముక."},
+      {id:"fs7", title_en:"Capstone Project", title_te:"క్యాప్‌స్టోన్ ప్రాజెక్ట్", type:"internal", desc_en:"Build one full project end-to-end — this is what recruiters ask about.", desc_te:"ఒక పూర్తి ప్రాజెక్ట్‌ను మొదటి నుండి చివరి వరకు నిర్మించండి — దీని గురించే రిక్రూటర్‌లు అడుగుతారు."},
+      {id:"fs8", title_en:"Deploy & Share", title_te:"డిప్లాయ్ & షేర్", type:"external", link:"https://vercel.com/docs", desc_en:"Put your project live on the internet with a real link.", desc_te:"మీ ప్రాజెక్ట్‌ను నిజమైన లింక్‌తో ఇంటర్నెట్‌లో లైవ్ చేయండి."},
+    ]
+  },
+
+  "cse-cp": {
+    degree:"btech", branch:"cse",
+    title_en:"Competitive Programmer / SDE", title_te:"కాంపిటీటివ్ ప్రోగ్రామర్ / SDE",
+    tagline_en:"Crack coding interviews at top product companies.", tagline_te:"టాప్ ప్రొడక్ట్ కంపెనీల కోడింగ్ ఇంటర్వ్యూలను ఛేదించండి.",
+    desc_en:"Deep, focused practice on data structures and algorithms — the exact skill tested by Amazon, Google, Flipkart and every serious tech interview.",
+    desc_te:"డేటా స్ట్రక్చర్లు, అల్గారిథమ్‌లపై లోతైన, ఫోకస్డ్ ప్రాక్టీస్ — Amazon, Google, Flipkart మరియు ప్రతి సీరియస్ టెక్ ఇంటర్వ్యూలో పరీక్షించే నైపుణ్యం సరిగ్గా ఇదే.",
+    timeline_en:"8–12 months of daily practice", timeline_te:"8–12 నెలల రోజువారీ ప్రాక్టీస్",
+    salary_en:"₹6–18 LPA to start", salary_te:"₹6–18 LPA ప్రారంభంలో",
+    roles:["SDE-1","Software Engineer","Backend Engineer"],
+    recruiters:["Amazon","Flipkart","Product startups","service companies"],
+    skills:["DSA","Problem solving","System design basics","CS fundamentals"],
+    nodes: [
+      {id:"cp1", title_en:"Arrays & Strings", title_te:"అర్రేలు & స్ట్రింగ్‌లు", type:"external", link:"https://leetcode.com/tag/array/", desc_en:"Warm up with the most common problem type in every contest.", desc_te:"ప్రతి కంటెస్ట్‌లో అత్యంత సాధారణ సమస్య రకంతో వేడెక్కండి."},
+      {id:"cp2", title_en:"Sorting & Searching", title_te:"సార్టింగ్ & సెర్చింగ్", type:"external", link:"https://www.geeksforgeeks.org/searching-algorithms/", desc_en:"The two ideas that quietly power half of all algorithms.", desc_te:"అన్ని అల్గారిథమ్‌లలో సగం భాగాన్ని నడిపించే రెండు ఆలోచనలు."},
+      {id:"cp3", title_en:"Recursion & Backtracking", title_te:"రికర్షన్ & బ్యాక్‌ట్రాకింగ్", type:"internal", desc_en:"Teach yourself to break big problems into smaller identical ones.", desc_te:"పెద్ద సమస్యలను చిన్న, ఒకేలా ఉండే సమస్యలుగా విభజించడం నేర్చుకోండి."},
+      {id:"cp4", title_en:"Trees & Graphs", title_te:"ట్రీలు & గ్రాఫ్‌లు", type:"external", link:"https://leetcode.com/tag/tree/", desc_en:"Model relationships and networks — asked in almost every interview.", desc_te:"సంబంధాలు మరియు నెట్‌వర్క్‌లను మోడల్ చేయండి — దాదాపు ప్రతి ఇంటర్వ్యూలో అడుగుతారు."},
+      {id:"cp5", title_en:"Dynamic Programming", title_te:"డైనమిక్ ప్రోగ్రామింగ్", type:"internal", desc_en:"The topic that scares everyone at first — we'll make it click.", desc_te:"మొదట్లో అందరినీ భయపెట్టే టాపిక్ — దాన్ని అర్థమయ్యేలా చేద్దాం."},
+      {id:"cp6", title_en:"Contest Practice", title_te:"కంటెస్ట్ ప్రాక్టీస్", type:"external", link:"https://codeforces.com/", desc_en:"Weekly contests to build real speed under pressure.", desc_te:"ఒత్తిడిలో నిజమైన వేగాన్ని పెంచుకోవడానికి వారపు కంటెస్ట్‌లు."},
+      {id:"cp7", title_en:"Mock Interviews", title_te:"మాక్ ఇంటర్వ్యూలు", type:"internal", desc_en:"Practice explaining your solution out loud, the way interviewers expect.", desc_te:"ఇంటర్వ్యూయర్‌లు ఆశించే విధంగా మీ పరిష్కారాన్ని బిగ్గరగా వివరించడం ప్రాక్టీస్ చేయండి."},
+    ]
+  },
+
+  "core-gate": {
+    degree:"btech", branch:"core",
+    title_en:"GATE / Core Engineering", title_te:"GATE / కోర్ ఇంజనీరింగ్",
+    tagline_en:"Open the door to PSUs, MTech and government jobs.", tagline_te:"PSU, MTech, ప్రభుత్వ ఉద్యోగాలకు తలుపు తెరవండి.",
+    desc_en:"Works for any branch — CSE, ECE, EEE, Mechanical or Civil. A structured revision of your core subjects aimed straight at the GATE exam, which unlocks PSU jobs, MTech admission, and fellowships.",
+    desc_te:"ఏ బ్రాంచ్‌కైనా పనిచేస్తుంది — CSE, ECE, EEE, మెకానికల్ లేదా సివిల్. PSU ఉద్యోగాలు, MTech అడ్మిషన్, ఫెలోషిప్‌లను తెరిచే GATE పరీక్షను లక్ష్యంగా చేసుకుని మీ కోర్ సబ్జెక్టుల నిర్మాణాత్మక రివిజన్.",
+    timeline_en:"10–14 months of steady prep", timeline_te:"10–14 నెలల స్థిరమైన ప్రిపరేషన్",
+    salary_en:"₹7–15 LPA in PSUs after GATE", salary_te:"GATE తర్వాత PSU లలో ₹7–15 LPA",
+    roles:["PSU Engineer Trainee","MTech Scholar","Research Fellow"],
+    recruiters:["BHEL","ONGC","NTPC","ISRO","IITs/NITs for MTech"],
+    skills:["Core subject depth","Engineering maths","Time management","Mock testing"],
+    nodes: [
+      {id:"c1", title_en:"Engineering Mathematics", title_te:"ఇంజనీరింగ్ గణితం", type:"external", link:"https://nptel.ac.in/", desc_en:"Linear algebra, calculus and transforms — the base of every core paper.", desc_te:"లీనియర్ ఆల్జీబ్రా, కాలిక్యులస్, ట్రాన్స్‌ఫార్మ్‌లు — ప్రతి కోర్ పేపర్‌కు ఆధారం."},
+      {id:"c2", title_en:"Core Subject Deep Dive", title_te:"కోర్ సబ్జెక్ట్ లోతైన అధ్యయనం", type:"internal", desc_en:"Focused revision of your branch's top-weightage GATE subjects.", desc_te:"మీ బ్రాంచ్ యొక్క అత్యధిక వెయిటేజ్ GATE సబ్జెక్టుల ఫోకస్డ్ రివిజన్."},
+      {id:"c3", title_en:"Previous Year Papers", title_te:"మునుపటి సంవత్సరాల పేపర్లు", type:"external", link:"https://gate.iitk.ac.in/", desc_en:"Practice with real GATE papers to learn the question patterns.", desc_te:"ప్రశ్న పద్ధతులను నేర్చుకోవడానికి నిజమైన GATE పేపర్లతో ప్రాక్టీస్ చేయండి."},
+      {id:"c4", title_en:"Weekly Mock Test", title_te:"వారపు మాక్ టెస్ట్", type:"internal", desc_en:"Timed practice under real exam conditions.", desc_te:"నిజమైన పరీక్ష పరిస్థితుల్లో టైమ్డ్ ప్రాక్టీస్."},
+      {id:"c5", title_en:"Weak-Area Sprint", title_te:"బలహీన ప్రాంత స్ప్రింట్", type:"internal", desc_en:"A focused sprint on whatever your mock tests reveal you're missing.", desc_te:"మీ మాక్ టెస్ట్‌లు మీకు లోపం ఉన్నట్లు చూపించే దానిపై ఫోకస్డ్ స్ప్రింట్."},
+      {id:"c6", title_en:"Interview & PSU Prep", title_te:"ఇంటర్వ్యూ & PSU ప్రిపరేషన్", type:"internal", desc_en:"Practice explaining core concepts out loud, clearly and confidently.", desc_te:"కోర్ కాన్సెప్టులను స్పష్టంగా, నమ్మకంగా బిగ్గరగా వివరించడం ప్రాక్టీస్ చేయండి."},
+    ]
+  },
+
+  "ece-vlsi": {
+    degree:"btech", branch:"ece",
+    title_en:"VLSI & Chip Design", title_te:"VLSI & చిప్ డిజైన్",
+    tagline_en:"Design the silicon inside every phone and laptop.", tagline_te:"ప్రతి ఫోన్, ల్యాప్‌టాప్ లోపల ఉండే సిలికాన్‌ను డిజైన్ చేయండి.",
+    desc_en:"You'll go from logic gates to real chip-design tools, learning how a circuit becomes silicon. A high-value niche with strong pay once you clear the entry bar.",
+    desc_te:"లాజిక్ గేట్ల నుండి నిజమైన చిప్-డిజైన్ టూల్స్ వరకు, ఒక సర్క్యూట్ సిలికాన్‌గా ఎలా మారుతుందో నేర్చుకుంటారు. ఎంట్రీ బార్ దాటాక మంచి జీతం ఉండే విలువైన నిష్‌.",
+    timeline_en:"9–14 months of focused study", timeline_te:"9–14 నెలల ఫోకస్డ్ స్టడీ",
+    salary_en:"₹5–10 LPA to start", salary_te:"₹5–10 LPA ప్రారంభంలో",
+    roles:["Digital Design Engineer","Verification Engineer (entry)","Physical Design Trainee"],
+    recruiters:["Qualcomm","AMD","Intel","Texas Instruments","semiconductor startups"],
+    skills:["Digital logic","Verilog/VHDL","Computer architecture","EDA tools"],
+    nodes: [
+      {id:"ev1", title_en:"Digital Logic & Design", title_te:"డిజిటల్ లాజిక్ & డిజైన్", type:"external", link:"https://nptel.ac.in/courses/108105113", desc_en:"Gates, flip-flops and boolean logic — the alphabet of chip design.", desc_te:"గేట్లు, ఫ్లిప్-ఫ్లాప్‌లు, బూలియన్ లాజిక్ — చిప్ డిజైన్‌కు అక్షరమాల."},
+      {id:"ev2", title_en:"Verilog / VHDL Basics", title_te:"Verilog / VHDL బేసిక్స్", type:"internal", desc_en:"The hardware description languages used to design real chips.", desc_te:"నిజమైన చిప్‌లను డిజైన్ చేయడానికి ఉపయోగించే హార్డ్‌వేర్ డిస్క్రిప్షన్ భాషలు."},
+      {id:"ev3", title_en:"Digital IC Design Lab", title_te:"డిజిటల్ IC డిజైన్ ల్యాబ్", type:"internal", desc_en:"Hands-on practice simulating and testing small digital circuits.", desc_te:"చిన్న డిజిటల్ సర్క్యూట్లను సిమ్యులేట్ చేసి, పరీక్షించే హ్యాండ్స్-ఆన్ ప్రాక్టీస్."},
+      {id:"ev4", title_en:"Physical Design & EDA Tools", title_te:"ఫిజికల్ డిజైన్ & EDA టూల్స్", type:"external", link:"https://nptel.ac.in/courses/117106133", desc_en:"How a logic design turns into an actual physical chip layout.", desc_te:"ఒక లాజిక్ డిజైన్ నిజమైన ఫిజికల్ చిప్ లేఅవుట్‌గా ఎలా మారుతుందో."},
+      {id:"ev5", title_en:"Mini Project & Portfolio", title_te:"మినీ ప్రాజెక్ట్ & పోర్ట్‌ఫోలియో", type:"internal", desc_en:"Design and document one small chip-design project for interviews.", desc_te:"ఇంటర్వ్యూల కోసం ఒక చిన్న చిప్-డిజైన్ ప్రాజెక్ట్‌ను డిజైన్ చేసి డాక్యుమెంట్ చేయండి."},
+    ]
+  },
+
+  "ece-embedded": {
+    degree:"btech", branch:"ece",
+    title_en:"Embedded Systems & IoT", title_te:"ఎంబెడెడ్ సిస్టమ్స్ & IoT",
+    tagline_en:"Build the brains inside smart devices.", tagline_te:"స్మార్ట్ డివైజ్‌ల లోపల మెదడును నిర్మించండి.",
+    desc_en:"From smart irrigation to wearable health devices, embedded engineers write the code that runs directly on hardware. Practical, hands-on, and full of build-it-yourself moments.",
+    desc_te:"స్మార్ట్ ఇరిగేషన్ నుండి వేరబుల్ హెల్త్ డివైజ్‌ల వరకు, ఎంబెడెడ్ ఇంజనీర్లు హార్డ్‌వేర్‌పై నేరుగా నడిచే కోడ్‌ను రాస్తారు. ప్రాక్టికల్, హ్యాండ్స్-ఆన్, మీరే నిర్మించుకునే క్షణాలతో నిండి ఉంటుంది.",
+    timeline_en:"6–10 months of focused study", timeline_te:"6–10 నెలల ఫోకస్డ్ స్టడీ",
+    salary_en:"₹4–8 LPA to start", salary_te:"₹4–8 LPA ప్రారంభంలో",
+    roles:["Embedded Software Engineer","IoT Developer","Firmware Engineer (entry)"],
+    recruiters:["Bosch","automotive suppliers","IoT startups","electronics manufacturers"],
+    skills:["Embedded C","Microcontrollers","Sensors","RTOS basics","Cloud connectivity"],
+    nodes: [
+      {id:"ee1", title_en:"Embedded C & Microcontrollers", title_te:"ఎంబెడెడ్ C & మైక్రోకంట్రోలర్లు", type:"external", link:"https://nptel.ac.in/courses/108105193", desc_en:"How to write code that talks directly to hardware.", desc_te:"హార్డ్‌వేర్‌తో నేరుగా మాట్లాడే కోడ్‌ను ఎలా రాయాలో."},
+      {id:"ee2", title_en:"Arduino / ESP32 Hands-on", title_te:"Arduino / ESP32 హ్యాండ్స్-ఆన్", type:"internal", desc_en:"Build your first working circuit and blink your first LED — literally.", desc_te:"మీ మొదటి పని చేసే సర్క్యూట్‌ను నిర్మించి, మొదటి LED ను వెలిగించండి."},
+      {id:"ee3", title_en:"Sensors & RTOS Basics", title_te:"సెన్సర్లు & RTOS బేసిక్స్", type:"internal", desc_en:"Read real-world signals and manage multiple tasks on tiny hardware.", desc_te:"నిజ-ప్రపంచ సిగ్నల్స్‌ను చదవడం, చిన్న హార్డ్‌వేర్‌పై అనేక టాస్క్‌లను నిర్వహించడం."},
+      {id:"ee4", title_en:"IoT Cloud Connectivity", title_te:"IoT క్లౌడ్ కనెక్టివిటీ", type:"external", link:"https://www.freertos.org/", desc_en:"Send sensor data from your device to the cloud for monitoring.", desc_te:"మానిటరింగ్ కోసం మీ డివైజ్ నుండి సెన్సర్ డేటాను క్లౌడ్‌కు పంపండి."},
+      {id:"ee5", title_en:"Capstone IoT Project", title_te:"క్యాప్‌స్టోన్ IoT ప్రాజెక్ట్", type:"internal", desc_en:"Build a smart-agriculture or smart-home device end-to-end.", desc_te:"ఒక స్మార్ట్-అగ్రికల్చర్ లేదా స్మార్ట్-హోమ్ డివైజ్‌ను మొదటి నుండి చివరి వరకు నిర్మించండి."},
+    ]
+  },
+
+  "eee-power": {
+    degree:"btech", branch:"eee",
+    title_en:"Power Systems Engineer", title_te:"పవర్ సిస్టమ్స్ ఇంజనీర్",
+    tagline_en:"Keep the lights on — for the whole grid.", tagline_te:"మొత్తం గ్రిడ్‌కు కరెంటు అందేలా చూడండి.",
+    desc_en:"Learn how electricity travels from power plants to your home, and how engineers design substations, transmission lines and renewable-energy systems that keep it reliable.",
+    desc_te:"విద్యుత్ ప్లాంట్ల నుండి మీ ఇంటికి కరెంటు ఎలా చేరుతుందో, ఇంజనీర్లు సబ్‌స్టేషన్లు, ట్రాన్స్‌మిషన్ లైన్లు, రెన్యూవబుల్-ఎనర్జీ సిస్టమ్‌లను ఎలా విశ్వసనీయంగా డిజైన్ చేస్తారో నేర్చుకోండి.",
+    timeline_en:"8–12 months of focused study", timeline_te:"8–12 నెలల ఫోకస్డ్ స్టడీ",
+    salary_en:"₹4–8 LPA to start", salary_te:"₹4–8 LPA ప్రారంభంలో",
+    roles:["Substation Engineer (entry)","Power Systems Trainee","Renewable Energy Engineer"],
+    recruiters:["State electricity boards","NTPC","Adani Power","solar/wind EPC companies"],
+    skills:["Circuit theory","Electrical machines","Power systems analysis","Smart grid basics"],
+    nodes: [
+      {id:"ep1", title_en:"Circuit Theory & Power Basics", title_te:"సర్క్యూట్ థియరీ & పవర్ బేసిక్స్", type:"external", link:"https://nptel.ac.in/courses/108101088", desc_en:"The foundation every power engineer builds on.", desc_te:"ప్రతి పవర్ ఇంజనీర్ నిర్మించుకునే పునాది."},
+      {id:"ep2", title_en:"Electrical Machines", title_te:"ఎలక్ట్రికల్ మెషిన్లు", type:"internal", desc_en:"Motors, generators and transformers — how energy changes form.", desc_te:"మోటార్లు, జనరేటర్లు, ట్రాన్స్‌ఫార్మర్లు — శక్తి రూపం ఎలా మారుతుందో."},
+      {id:"ep3", title_en:"Power Systems Analysis", title_te:"పవర్ సిస్టమ్స్ అనాలిసిస్", type:"external", link:"https://nptel.ac.in/courses/108104052", desc_en:"How large grids are modelled, balanced and protected.", desc_te:"పెద్ద గ్రిడ్‌లు ఎలా మోడల్ చేయబడతాయో, బ్యాలెన్స్ చేయబడతాయో, రక్షించబడతాయో."},
+      {id:"ep4", title_en:"Renewable Energy & Smart Grid", title_te:"రెన్యూవబుల్ ఎనర్జీ & స్మార్ట్ గ్రిడ్", type:"internal", desc_en:"Solar, wind and the smart systems that are reshaping this field.", desc_te:"సోలార్, విండ్, ఈ రంగాన్ని మారుస్తున్న స్మార్ట్ సిస్టమ్‌లు."},
+      {id:"ep5", title_en:"Internship & Site Readiness", title_te:"ఇంటర్న్‌షిప్ & సైట్ సంసిద్ధత", type:"internal", desc_en:"Safety basics and what to expect on your first substation visit.", desc_te:"భద్రతా బేసిక్స్ మరియు మీ మొదటి సబ్‌స్టేషన్ సందర్శనలో ఏమి ఆశించాలో."},
+    ]
+  },
+
+  "mech-design": {
+    degree:"btech", branch:"mech",
+    title_en:"Design & CAD Engineer", title_te:"డిజైన్ & CAD ఇంజనీర్",
+    tagline_en:"Turn ideas into parts that can actually be built.", tagline_te:"ఆలోచనలను నిజంగా నిర్మించగల భాగాలుగా మార్చండి.",
+    desc_en:"Learn to design mechanical parts and assemblies in CAD software, check they'll survive real-world stress, and prepare them for manufacturing.",
+    desc_te:"CAD సాఫ్ట్‌వేర్‌లో మెకానికల్ భాగాలు, అసెంబ్లీలను డిజైన్ చేయడం, అవి నిజ-ప్రపంచ ఒత్తిడిని తట్టుకుంటాయో లేదో చెక్ చేయడం, తయారీ కోసం సిద్ధం చేయడం నేర్చుకోండి.",
+    timeline_en:"7–11 months of focused study", timeline_te:"7–11 నెలల ఫోకస్డ్ స్టడీ",
+    salary_en:"₹3.5–7 LPA to start", salary_te:"₹3.5–7 LPA ప్రారంభంలో",
+    roles:["Design Engineer (entry)","CAD Engineer","Product Development Trainee"],
+    recruiters:["automotive OEMs","manufacturing companies","design consultancies"],
+    skills:["Engineering drawing","SolidWorks/AutoCAD","DFM principles","FEA basics"],
+    nodes: [
+      {id:"md1", title_en:"Engineering Drawing & CAD Basics", title_te:"ఇంజనీరింగ్ డ్రాయింగ్ & CAD బేసిక్స్", type:"external", link:"https://nptel.ac.in/courses/112103019", desc_en:"The universal visual language every mechanical engineer reads.", desc_te:"ప్రతి మెకానికల్ ఇంజనీర్ చదివే విశ్వవ్యాప్త దృశ్య భాష."},
+      {id:"md2", title_en:"SolidWorks / AutoCAD Practice", title_te:"SolidWorks / AutoCAD ప్రాక్టీస్", type:"internal", desc_en:"Model real 3D parts, not just textbook shapes.", desc_te:"పాఠ్యపుస్తక ఆకారాలు మాత్రమే కాదు, నిజమైన 3D భాగాలను మోడల్ చేయండి."},
+      {id:"md3", title_en:"Design for Manufacturing", title_te:"తయారీ కోసం డిజైన్", type:"internal", desc_en:"Design parts that a factory can actually produce affordably.", desc_te:"ఒక ఫ్యాక్టరీ నిజంగా చౌకగా ఉత్పత్తి చేయగల భాగాలను డిజైన్ చేయండి."},
+      {id:"md4", title_en:"FEA & Simulation Basics", title_te:"FEA & సిమ్యులేషన్ బేసిక్స్", type:"external", link:"https://nptel.ac.in/courses/112104193", desc_en:"Test whether a part will break — inside the computer, before it's built.", desc_te:"ఒక భాగం విరుగుతుందో లేదో — అది నిర్మించేముందే కంప్యూటర్‌లో పరీక్షించండి."},
+      {id:"md5", title_en:"Design Portfolio Project", title_te:"డిజైన్ పోర్ట్‌ఫోలియో ప్రాజెక్ట్", type:"internal", desc_en:"One complete design project, from sketch to simulation, for interviews.", desc_te:"ఇంటర్వ్యూల కోసం స్కెచ్ నుండి సిమ్యులేషన్ వరకు ఒక పూర్తి డిజైన్ ప్రాజెక్ట్."},
+    ]
+  },
+
+  "mech-manufacturing": {
+    degree:"btech", branch:"mech",
+    title_en:"Manufacturing & Robotics", title_te:"మ్యానుఫ్యాక్చరింగ్ & రోబోటిక్స్",
+    tagline_en:"Run the factories that build everything else.", tagline_te:"మిగతా అన్నిటినీ నిర్మించే ఫ్యాక్టరీలను నడపండి.",
+    desc_en:"From CNC machines to factory robots, learn how modern manufacturing actually works — and how automation is changing it.",
+    desc_te:"CNC మెషీన్ల నుండి ఫ్యాక్టరీ రోబోట్ల వరకు, ఆధునిక తయారీ ఎలా పనిచేస్తుందో, ఆటోమేషన్ దాన్ని ఎలా మారుస్తుందో నేర్చుకోండి.",
+    timeline_en:"7–11 months of focused study", timeline_te:"7–11 నెలల ఫోకస్డ్ స్టడీ",
+    salary_en:"₹3.5–7.5 LPA to start", salary_te:"₹3.5–7.5 LPA ప్రారంభంలో",
+    roles:["Production Engineer (entry)","Automation Engineer","Manufacturing Trainee"],
+    recruiters:["automotive plants","heavy engineering firms","robotics startups"],
+    skills:["Manufacturing processes","CNC & automation","Robotics fundamentals","PLC basics"],
+    nodes: [
+      {id:"mm1", title_en:"Manufacturing Processes", title_te:"మ్యానుఫ్యాక్చరింగ్ ప్రాసెస్‌లు", type:"external", link:"https://nptel.ac.in/courses/112105126", desc_en:"Casting, welding, machining — how raw material becomes a product.", desc_te:"కాస్టింగ్, వెల్డింగ్, మెషినింగ్ — ముడి పదార్థం ఒక ఉత్పత్తిగా ఎలా మారుతుందో."},
+      {id:"mm2", title_en:"CNC & Automation Basics", title_te:"CNC & ఆటోమేషన్ బేసిక్స్", type:"internal", desc_en:"How computer-controlled machines cut parts with precision.", desc_te:"కంప్యూటర్-నియంత్రిత మెషీన్లు ఖచ్చితత్వంతో భాగాలను ఎలా కోస్తాయో."},
+      {id:"mm3", title_en:"Robotics Fundamentals", title_te:"రోబోటిక్స్ ఫండమెంటల్స్", type:"external", link:"https://www.coursera.org/learn/robotics-fundamentals", desc_en:"Kinematics and control — the basics behind every industrial robot arm.", desc_te:"కైనమాటిక్స్ మరియు కంట్రోల్ — ప్రతి ఇండస్ట్రియల్ రోబోట్ ఆర్మ్ వెనుక ఉన్న బేసిక్స్."},
+      {id:"mm4", title_en:"PLC & Industrial Automation", title_te:"PLC & ఇండస్ట్రియల్ ఆటోమేషన్", type:"internal", desc_en:"The control systems that run entire factory production lines.", desc_te:"మొత్తం ఫ్యాక్టరీ ప్రొడక్షన్ లైన్లను నడిపే కంట్రోల్ సిస్టమ్‌లు."},
+      {id:"mm5", title_en:"Robotics Capstone Project", title_te:"రోబోటిక్స్ క్యాప్‌స్టోన్ ప్రాజెక్ట్", type:"internal", desc_en:"Build and document a small automated system for your portfolio.", desc_te:"మీ పోర్ట్‌ఫోలియో కోసం ఒక చిన్న ఆటోమేటెడ్ సిస్టమ్‌ను నిర్మించి డాక్యుమెంట్ చేయండి."},
+    ]
+  },
+
+  "civil-structural": {
+    degree:"btech", branch:"civil",
+    title_en:"Structural & Site Engineer", title_te:"స్ట్రక్చరల్ & సైట్ ఇంజనీర్",
+    tagline_en:"Design and build the structures people trust with their lives.", tagline_te:"ప్రజలు తమ జీవితాలను నమ్మే నిర్మాణాలను డిజైన్ చేసి కట్టండి.",
+    desc_en:"Learn structural analysis, concrete design, and what it actually takes to run a construction site safely and on schedule.",
+    desc_te:"స్ట్రక్చరల్ అనాలిసిస్, కాంక్రీట్ డిజైన్, ఒక నిర్మాణ స్థలాన్ని సురక్షితంగా, సమయానికి నడపడానికి నిజంగా ఏమి కావాలో నేర్చుకోండి.",
+    timeline_en:"7–11 months of focused study", timeline_te:"7–11 నెలల ఫోకస్డ్ స్టడీ",
+    salary_en:"₹3.5–7 LPA to start", salary_te:"₹3.5–7 LPA ప్రారంభంలో",
+    roles:["Site Engineer (entry)","Structural Design Trainee","Quantity Surveyor"],
+    recruiters:["L&T Construction","real-estate developers","government PWD"],
+    skills:["Structural analysis","AutoCAD/Revit","Concrete technology","Site safety & execution"],
+    nodes: [
+      {id:"cs1", title_en:"Structural Analysis Basics", title_te:"స్ట్రక్చరల్ అనాలిసిస్ బేసిక్స్", type:"external", link:"https://nptel.ac.in/courses/105101085", desc_en:"How loads travel through a building, from roof to foundation.", desc_te:"ఒక భవనంలో పైకప్పు నుండి పునాది వరకు లోడ్‌లు ఎలా ప్రయాణిస్తాయో."},
+      {id:"cs2", title_en:"AutoCAD / Revit for Civil", title_te:"సివిల్ కోసం AutoCAD / Revit", type:"internal", desc_en:"Draw the plans that contractors and workers build from.", desc_te:"కాంట్రాక్టర్లు, కార్మికులు నిర్మించే ప్లాన్‌లను గీయండి."},
+      {id:"cs3", title_en:"Concrete Technology & Design", title_te:"కాంక్రీట్ టెక్నాలజీ & డిజైన్", type:"internal", desc_en:"How concrete is mixed, tested and designed to bear real loads.", desc_te:"కాంక్రీట్‌ను ఎలా కలుపుతారు, పరీక్షిస్తారు, నిజమైన లోడ్లను మోయడానికి డిజైన్ చేస్తారో."},
+      {id:"cs4", title_en:"Site Execution & Safety", title_te:"సైట్ ఎగ్జిక్యూషన్ & సేఫ్టీ", type:"internal", desc_en:"What actually happens day-to-day on a live construction site.", desc_te:"ఒక లైవ్ నిర్మాణ స్థలంలో రోజువారీగా ఏమి జరుగుతుందో."},
+      {id:"cs5", title_en:"Structural Design Mini Project", title_te:"స్ట్రక్చరల్ డిజైన్ మినీ ప్రాజెక్ట్", type:"internal", desc_en:"Design one small structure end-to-end for your portfolio.", desc_te:"మీ పోర్ట్‌ఫోలియో కోసం ఒక చిన్న నిర్మాణాన్ని మొదటి నుండి చివరి వరకు డిజైన్ చేయండి."},
+    ]
+  },
+
+  "mtech-research": {
+    degree:"mtech", branch:"mtech",
+    title_en:"Research & MS Abroad Track", title_te:"రీసెర్చ్ & MS Abroad దారి",
+    tagline_en:"Turn your MTech into a launchpad for research or study abroad.", tagline_te:"మీ MTech ను రీసెర్చ్ లేదా విదేశీ చదువుకు లాంచ్‌ప్యాడ్‌గా మార్చండి.",
+    desc_en:"Build a genuine research profile — papers, projects, and test scores — aimed at a strong MS/PhD application or research role.",
+    desc_te:"బలమైన MS/PhD అప్లికేషన్ లేదా రీసెర్చ్ పాత్ర కోసం — పేపర్లు, ప్రాజెక్టులు, టెస్ట్ స్కోర్లతో నిజమైన రీసెర్చ్ ప్రొఫైల్‌ను నిర్మించండి.",
+    timeline_en:"12–18 months, alongside your MTech", timeline_te:"12–18 నెలలు, మీ MTech తో పాటు",
+    salary_en:"Funded MS/PhD positions abroad; ₹6–12 LPA in research roles in India", salary_te:"విదేశాల్లో ఫండెడ్ MS/PhD స్థానాలు; భారత్‌లో రీసెర్చ్ పాత్రలలో ₹6–12 LPA",
+    roles:["Research Assistant","MS/PhD Scholar","Research Associate"],
+    recruiters:["universities abroad","CSIR labs","IIT/IISc research groups"],
+    skills:["Literature review","Academic writing","Advanced maths","GRE/IELTS prep"],
+    nodes: [
+      {id:"mr1", title_en:"Research Fundamentals & Literature Review", title_te:"రీసెర్చ్ ఫండమెంటల్స్ & లిటరేచర్ రివ్యూ", type:"internal", desc_en:"How to read papers critically and find a real research gap.", desc_te:"పేపర్లను విమర్శనాత్మకంగా చదవడం, నిజమైన రీసెర్చ్ గ్యాప్‌ను కనుగొనడం ఎలా."},
+      {id:"mr2", title_en:"Advanced Mathematics for Research", title_te:"రీసెర్చ్ కోసం అడ్వాన్స్‌డ్ మ్యాథమెటిక్స్", type:"external", link:"https://nptel.ac.in/", desc_en:"The mathematical tools most research papers in your field assume you know.", desc_te:"మీ రంగంలో చాలా రీసెర్చ్ పేపర్లు మీకు తెలుసు అని భావించే గణిత సాధనాలు."},
+      {id:"mr3", title_en:"Paper Writing & LaTeX", title_te:"పేపర్ రైటింగ్ & LaTeX", type:"external", link:"https://www.overleaf.com/learn", desc_en:"Format and write your work the way journals and conferences expect.", desc_te:"జర్నల్స్, కాన్ఫరెన్స్‌లు ఆశించే విధంగా మీ పనిని ఫార్మాట్ చేసి రాయండి."},
+      {id:"mr4", title_en:"GRE/IELTS Prep & SOP", title_te:"GRE/IELTS ప్రిపరేషన్ & SOP", type:"internal", desc_en:"Standardised tests and a statement of purpose that tells your real story.", desc_te:"స్టాండర్డైజ్డ్ టెస్టులు మరియు మీ నిజమైన కథను చెప్పే స్టేట్‌మెంట్ ఆఫ్ పర్పస్."},
+      {id:"mr5", title_en:"Publish a Paper or Poster", title_te:"పేపర్ లేదా పోస్టర్ ప్రచురించండి", type:"internal", desc_en:"Turn your MTech project into a real, citable piece of research.", desc_te:"మీ MTech ప్రాజెక్ట్‌ను నిజమైన, సైట్ చేయదగిన రీసెర్చ్‌గా మార్చండి."},
+    ]
+  },
+
+  "mtech-psu": {
+    degree:"mtech", branch:"mtech",
+    title_en:"PSU / Government R&D Track", title_te:"PSU / ప్రభుత్వ R&D దారి",
+    tagline_en:"Aim for stable, high-respect government engineering roles.", tagline_te:"స్థిరమైన, గౌరవప్రదమైన ప్రభుత్వ ఇంజనీరింగ్ పాత్రలను లక్ష్యంగా చేసుకోండి.",
+    desc_en:"MTech graduates get a direct edge in PSU recruitment through GATE score and specialised interviews. This path sharpens both.",
+    desc_te:"MTech గ్రాడ్యుయేట్లు GATE స్కోర్, స్పెషలైజ్డ్ ఇంటర్వ్యూల ద్వారా PSU రిక్రూట్‌మెంట్‌లో నేరుగా ప్రయోజనం పొందుతారు. ఈ దారి రెండింటినీ మెరుగుపరుస్తుంది.",
+    timeline_en:"6–10 months of focused prep", timeline_te:"6–10 నెలల ఫోకస్డ్ ప్రిపరేషన్",
+    salary_en:"₹8–16 LPA at PSUs post-MTech", salary_te:"MTech తర్వాత PSU లలో ₹8–16 LPA",
+    roles:["Senior Engineer (PSU)","R&D Officer","Scientist/Engineer (govt labs)"],
+    recruiters:["ISRO","DRDO","BARC","BHEL","ONGC"],
+    skills:["Advanced GATE-level depth","Interview communication","Domain specialisation","Current affairs"],
+    nodes: [
+      {id:"mp1", title_en:"GATE Advanced Revision", title_te:"GATE అడ్వాన్స్‌డ్ రివిజన్", type:"external", link:"https://gate.iitk.ac.in/", desc_en:"Push your GATE score higher — MTech-level PSU cutoffs are competitive.", desc_te:"మీ GATE స్కోర్‌ను మరింత పెంచుకోండి — MTech-స్థాయి PSU కటాఫ్‌లు పోటీగా ఉంటాయి."},
+      {id:"mp2", title_en:"PSU Exam Pattern & Papers", title_te:"PSU పరీక్షా విధానం & పేపర్లు", type:"internal", desc_en:"Each PSU has its own pattern — learn the ones relevant to you.", desc_te:"ప్రతి PSU కు దాని స్వంత విధానం ఉంటుంది — మీకు సంబంధించినవి నేర్చుకోండి."},
+      {id:"mp3", title_en:"Technical + General Awareness", title_te:"టెక్నికల్ + జనరల్ అవేర్‌నెస్", type:"internal", desc_en:"Round out your prep beyond pure technical depth.", desc_te:"కేవలం సాంకేతిక లోతు దాటి మీ ప్రిపరేషన్‌ను పూర్తి చేయండి."},
+      {id:"mp4", title_en:"Group Discussion & Interview Prep", title_te:"గ్రూప్ డిస్కషన్ & ఇంటర్వ్యూ ప్రిపరేషన్", type:"internal", desc_en:"Practice thinking and speaking clearly under panel pressure.", desc_te:"ప్యానెల్ ఒత్తిడిలో స్పష్టంగా ఆలోచించడం, మాట్లాడటం ప్రాక్టీస్ చేయండి."},
+      {id:"mp5", title_en:"Mock PSU Interview", title_te:"మాక్ PSU ఇంటర్వ్యూ", type:"internal", desc_en:"A full simulated interview so the real one holds no surprises.", desc_te:"నిజమైనది ఎలాంటి ఆశ్చర్యాలు లేకుండా ఉండేలా పూర్తి సిమ్యులేటెడ్ ఇంటర్వ్యూ."},
+    ]
+  },
+
+  "mtech-industry": {
+    degree:"mtech", branch:"mtech",
+    title_en:"Industry R&D / Specialist Engineer", title_te:"ఇండస్ట్రీ R&D / స్పెషలిస్ట్ ఇంజనీర్",
+    tagline_en:"Become the deep specialist companies build teams around.", tagline_te:"కంపెనీలు టీమ్‌లను నిర్మించే లోతైన స్పెషలిస్ట్‌గా మారండి.",
+    desc_en:"Go beyond your MTech coursework into industry-recognised tools, a mentored R&D project, and a specialist's portfolio that stands out from generic resumes.",
+    desc_te:"మీ MTech కోర్స్‌వర్క్ దాటి ఇండస్ట్రీ-గుర్తింపు పొందిన టూల్స్, మెంటార్డ్ R&D ప్రాజెక్ట్, సాధారణ రెజ్యూమ్‌ల నుండి ప్రత్యేకంగా నిలిచే స్పెషలిస్ట్ పోర్ట్‌ఫోలియోలోకి వెళ్లండి.",
+    timeline_en:"8–12 months alongside your MTech", timeline_te:"8–12 నెలలు మీ MTech తో పాటు",
+    salary_en:"₹9–20 LPA depending on domain", salary_te:"డొమైన్ ఆధారంగా ₹9–20 LPA",
+    roles:["R&D Engineer","Specialist Engineer","Technical Lead (entry)"],
+    recruiters:["core-tech MNCs","R&D centres","deep-tech startups"],
+    skills:["Domain specialisation","Industry tools/certifications","Technical writing","Patent basics"],
+    nodes: [
+      {id:"mi1", title_en:"Advanced Domain Specialisation", title_te:"అడ్వాన్స్‌డ్ డొమైన్ స్పెషలైజేషన్", type:"internal", desc_en:"Go one level deeper than your MTech syllabus into your chosen niche.", desc_te:"మీ MTech సిలబస్ కంటే ఒక స్థాయి లోతుగా మీ ఎంచుకున్న నిష్‌లోకి వెళ్ళండి."},
+      {id:"mi2", title_en:"Industry Tools & Certifications", title_te:"ఇండస్ట్రీ టూల్స్ & సర్టిఫికేషన్‌లు", type:"external", link:"https://nptel.ac.in/", desc_en:"The specific software or standards your target companies actually use.", desc_te:"మీ లక్ష్య కంపెనీలు నిజంగా ఉపయోగించే నిర్దిష్ట సాఫ్ట్‌వేర్ లేదా స్టాండర్డ్‌లు."},
+      {id:"mi3", title_en:"Mentored R&D Project", title_te:"మెంటార్డ్ R&D ప్రాజెక్ట్", type:"internal", desc_en:"A faculty- or industry-guided project that becomes your thesis and your pitch.", desc_te:"మీ థీసిస్‌గా, మీ పిచ్‌గా మారే ఫ్యాకల్టీ లేదా ఇండస్ట్రీ-గైడెడ్ ప్రాజెక్ట్."},
+      {id:"mi4", title_en:"Technical Paper / Patent Drafting", title_te:"టెక్నికల్ పేపర్ / పేటెంట్ డ్రాఫ్టింగ్", type:"internal", desc_en:"Document your work the way serious R&D teams expect.", desc_te:"సీరియస్ R&D టీమ్‌లు ఆశించే విధంగా మీ పనిని డాక్యుమెంట్ చేయండి."},
+      {id:"mi5", title_en:"Specialist Resume & LinkedIn", title_te:"స్పెషలిస్ట్ రెజ్యూమ్ & LinkedIn", type:"internal", desc_en:"Position yourself as a specialist, not a generic fresher.", desc_te:"మిమ్మల్ని ఒక సాధారణ ఫ్రెషర్‌గా కాదు, స్పెషలిస్ట్‌గా చూపించుకోండి."},
+    ]
+  },
+};
+
+const PATH_KEYS = Object.keys(PATHS);
+
+const QUIZ_BANK = {
+  default: [],
+  ds3: [
+    {q_en:"Which Pandas function loads a CSV file into a DataFrame?", q_te:"CSV ఫైల్‌ను DataFrame లోకి లోడ్ చేసేది ఏ Pandas ఫంక్షన్?", options:["read_csv()","load_csv()","open_csv()","import_csv()"], answer:0},
+    {q_en:"NumPy arrays are faster than Python lists mainly because:", q_te:"NumPy అర్రేలు పైథాన్ లిస్టుల కంటే వేగంగా ఉండటానికి ప్రధాన కారణం:", options:["They use fixed-type contiguous memory","They are written in Java","They cannot store numbers","They are always sorted"], answer:0},
+  ],
+  fs4: [
+    {q_en:"In React, what do you use to store data that changes over time in a component?", q_te:"React లో, ఒక కాంపొనెంట్‌లో సమయంతో మారే డేటాను నిల్వ చేయడానికి మీరు ఏమి ఉపయోగిస్తారు?", options:["state (useState)","CSS","HTML tags","props only"], answer:0},
+    {q_en:"Props in React are best described as:", q_te:"React లో props ను ఇలా వర్ణించవచ్చు:", options:["Data passed from parent to child component","A styling library","A database","A testing tool"], answer:0},
+  ],
+  cp1: [
+    {q_en:"What is the time complexity of searching in an unsorted array?", q_te:"సార్ట్ చేయని అర్రేలో వెతకడానికి టైమ్ కాంప్లెక్సిటీ ఎంత?", options:["O(n)","O(1)","O(log n)","O(n^2)"], answer:0},
+    {q_en:"Two-pointer technique is most useful for:", q_te:"టూ-పాయింటర్ టెక్నిక్ దేనికి బాగా ఉపయోగపడుతుంది:", options:["Sorted array pair/range problems","Sorting a graph","Compiling code","Drawing UI"], answer:0},
+  ],
+};
+
+/* ---------------------------------------------------------------------- */
+/*  CLAUDE API HELPER (real calls, no key needed in this environment)     */
+/* ---------------------------------------------------------------------- */
+async function askClaude(systemPrompt, userText) {
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 500,
+        system: systemPrompt,
+        messages: [{role:"user", content: userText}],
+      })
+    });
+    const data = await res.json();
+    if (data && data.content) {
+      const textBlock = data.content.find(c => c.type === "text");
+      if (textBlock) return textBlock.text;
+    }
+    return null;
+  } catch(e) {
+    return null;
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/*  SMALL UI PRIMITIVES                                                   */
+/* ---------------------------------------------------------------------- */
+function LangSwitch({lang, setLang}) {
+  return (
+    <button onClick={() => setLang(lang === "en" ? "te" : "en")}
+      className="flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-full border border-black/10 bg-white/70 hover:bg-white transition-colors flex-shrink-0">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 5h9M9 3v2m-1 0c0 4-2 8-6 10m2-4c1.5 1.5 4 3 7 3.5M13 21l4-9 4 9m-6.5-3h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      {lang === "en" ? "తెలుగు" : "English"}
+    </button>
+  );
+}
+
+function Logo({dark}) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{background:"linear-gradient(135deg,var(--marigold),var(--teal))"}}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 13l7-9 5 3 6-4-3 9-6 4-3-2-6 3z" stroke="white" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round"/><circle cx="17" cy="7" r="1.6" fill="white"/></svg>
+      </div>
+      <div className="leading-none">
+        <div className={"font-display font-extrabold text-lg " + (dark ? "text-white" : "text-[var(--ink)]")}>Sky Route</div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*  PATH CARD + DETAIL MODAL (shared by Explore & Onboarding)             */
+/* ---------------------------------------------------------------------- */
+function PathCard({lang, pathKey, path, selected, onSelect, onDetails}) {
+  const t = T[lang];
+  const theme = BRANCH_THEME[path.branch];
+  return (
+    <div className={"card card-hover shadow-sm bg-white rounded-2xl border-2 p-4 flex flex-col h-100 " + (selected ? "border-[var(--teal)]" : "border-black/10")}>
+      <div className="flex items-center gap-2 mb-2.5">
+        <span className="text-lg">{theme.icon}</span>
+        <span className="badge rounded-pill text-[10px] font-bold uppercase tracking-wide px-2 py-1" style={{background:theme.color+"22", color:theme.deep}}>
+          {lang==="te" ? theme.te : theme.en}
+        </span>
+        <span className="badge ml-auto text-[9px] font-bold uppercase tracking-wide px-1.5 py-1 rounded bg-black/5 text-[var(--muted)]" style={{marginLeft:"auto"}}>
+          {path.degree === "btech" ? "BTech" : "MTech"}
+        </span>
+      </div>
+      <h3 className={"font-display font-bold text-[15px] leading-snug mb-1 " + (lang==="te"?"font-te":"")}>{lang==="te" ? path.title_te : path.title_en}</h3>
+      <p className={"text-xs text-[var(--muted)] leading-relaxed mb-3 flex-1 " + (lang==="te"?"font-te":"")}>{lang==="te" ? path.tagline_te : path.tagline_en}</p>
+      <div className="flex items-center gap-2 mb-3 text-[11px] text-[var(--muted)]">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 7v5l3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6"/></svg>
+        <span>{lang==="te" ? path.timeline_te : path.timeline_en}</span>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={()=>onDetails(pathKey)} className="btn flex-1 text-xs font-semibold py-2 rounded-lg border border-black/10 hover:bg-black/[0.03]">
+          {t.viewDetails}
+        </button>
+        <button onClick={()=>onSelect(pathKey)} className="btn flex-1 text-xs font-bold py-2 rounded-lg text-white" style={{background: selected ? "var(--teal)" : theme.deep}}>
+          {selected ? "✓ " + t.statusDone : t.choosePath}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PathDetailModal({lang, pathKey, onClose, onChoose}) {
+  const t = T[lang];
+  if (!pathKey) return null;
+  const path = PATHS[pathKey];
+  const theme = BRANCH_THEME[path.branch];
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 px-0 sm:px-5" onClick={onClose}>
+      <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl p-6 max-h-[88vh] overflow-y-auto scrollbar-none fade-in" onClick={e=>e.stopPropagation()}>
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xl">{theme.icon}</span>
+          <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" style={{background:theme.color+"22", color:theme.deep}}>
+            {lang==="te" ? theme.te : theme.en} · {path.degree === "btech" ? "BTech" : "MTech"}
+          </span>
+        </div>
+        <h3 className={"font-display font-bold text-2xl mb-1.5 " + (lang==="te"?"font-te":"")}>{lang==="te" ? path.title_te : path.title_en}</h3>
+        <p className={"text-sm text-[var(--muted)] leading-relaxed mb-5 " + (lang==="te"?"font-te":"")}>{lang==="te" ? path.desc_te : path.desc_en}</p>
+
+        <div className="grid grid-cols-2 gap-3 mb-5">
+          <div className="bg-black/[0.03] rounded-xl p-3">
+            <div className={"text-[10px] font-bold uppercase tracking-wide text-[var(--muted)] mb-1 " + (lang==="te"?"font-te":"")}>{t.timelineLabel}</div>
+            <div className={"text-sm font-semibold " + (lang==="te"?"font-te":"")}>{lang==="te" ? path.timeline_te : path.timeline_en}</div>
+          </div>
+          <div className="bg-black/[0.03] rounded-xl p-3">
+            <div className={"text-[10px] font-bold uppercase tracking-wide text-[var(--muted)] mb-1 " + (lang==="te"?"font-te":"")}>{t.salaryLabel}</div>
+            <div className={"text-sm font-semibold " + (lang==="te"?"font-te":"")}>{lang==="te" ? path.salary_te : path.salary_en}</div>
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <div className={"text-[10px] font-bold uppercase tracking-wide text-[var(--muted)] mb-2 " + (lang==="te"?"font-te":"")}>{t.rolesLabel}</div>
+          <div className="flex flex-wrap gap-1.5">
+            {path.roles.map((r,i) => <span key={i} className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{background:theme.color+"18", color:theme.deep}}>{r}</span>)}
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <div className={"text-[10px] font-bold uppercase tracking-wide text-[var(--muted)] mb-2 " + (lang==="te"?"font-te":"")}>{t.skillsLabel}</div>
+          <div className="flex flex-wrap gap-1.5">
+            {path.skills.map((s,i) => <span key={i} className="text-xs font-medium px-2.5 py-1 rounded-full bg-black/5 text-[var(--ink)]">{s}</span>)}
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <div className={"text-[10px] font-bold uppercase tracking-wide text-[var(--muted)] mb-2 " + (lang==="te"?"font-te":"")}>{t.recruitersLabel}</div>
+          <div className={"text-sm text-[var(--muted)] " + (lang==="te"?"font-te":"")}>{path.recruiters.join(" · ")}</div>
+        </div>
+
+        <div className="mb-6">
+          <div className={"text-[10px] font-bold uppercase tracking-wide text-[var(--muted)] mb-2 " + (lang==="te"?"font-te":"")}>{t.yourPath}</div>
+          <div className="flex flex-col gap-1.5">
+            {path.nodes.map((n,i) => (
+              <div key={n.id} className="flex items-center gap-2.5 text-sm">
+                <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0" style={{background:theme.color+"22", color:theme.deep}}>{i+1}</span>
+                <span className={lang==="te"?"font-te":""}>{lang==="te" ? n.title_te : n.title_en}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2.5">
+          <button onClick={()=>onChoose(pathKey)} className="py-3 rounded-xl font-bold text-white text-sm" style={{background:theme.deep}}>
+            {t.choosePath}
+          </button>
+          <button onClick={onClose} className="py-2 rounded-xl font-semibold text-sm text-[var(--muted)]">{t.closeModal}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*  EXPLORE PATHS SCREEN                                                  */
+/* ---------------------------------------------------------------------- */
+function ExplorePaths({lang, setLang, onChoose, onBack, embedded, selectedKey}) {
+  const t = T[lang];
+  const [filter, setFilter] = useState("all");
+  const [detailKey, setDetailKey] = useState(null);
+
+  const filtered = PATH_KEYS.filter(k => filter === "all" || PATHS[k].degree === filter);
+  const groups = {};
+  filtered.forEach(k => {
+    const b = PATHS[k].branch;
+    groups[b] = groups[b] || [];
+    groups[b].push(k);
+  });
+
+  return (
+    <div className={embedded ? "" : "min-h-screen bg-[var(--parchment)] pb-16"}>
+      {!embedded && (
+        <nav className="navbar navbar-light bg-white sticky-top shadow-sm border-bottom">
+          <div className="container-xl d-flex align-items-center justify-content-between py-2">
+            <button onClick={onBack} className="btn btn-light rounded-pill d-flex align-items-center gap-2 border-0">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <Logo />
+            </button>
+            <LangSwitch lang={lang} setLang={setLang} />
+          </div>
+        </nav>
+      )}
+
+      <div className={embedded ? "" : "container-xl px-3 pt-4"}>
+        {!embedded && (
+          <div className="mb-4 fade-in">
+            <h1 className={"font-display font-extrabold display-6 mb-2 " + (lang==="te"?"font-te":"")}>{t.exploreTitle}</h1>
+            <p className={"text-sm text-[var(--muted)] max-w-xl " + (lang==="te"?"font-te":"")}>{t.exploreSub}</p>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 mb-6 overflow-x-auto scrollbar-none">
+          {[["all",t.filterAll],["btech",t.filterBtech],["mtech",t.filterMtech]].map(([k,label]) => (
+            <button key={k} onClick={()=>setFilter(k)}
+              className={"text-xs font-bold px-4 py-2 rounded-full flex-shrink-0 transition-colors " + (filter===k ? "text-white" : "bg-white border border-black/10 text-[var(--muted)]")}
+              style={filter===k ? {background:"var(--night)"} : {}}>
+              {label}
+            </button>
+          ))}
+          <span className="text-xs text-[var(--muted)] ml-1 flex-shrink-0">{filtered.length} {t.pathsCount}</span>
+        </div>
+
+        {Object.keys(groups).map(branchKey => {
+          const theme = BRANCH_THEME[branchKey];
+          return (
+            <div key={branchKey} className="mb-8">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-base">{theme.icon}</span>
+                <h2 className={"font-display font-bold text-sm uppercase tracking-wide " + (lang==="te"?"font-te":"")} style={{color:theme.deep}}>
+                  {lang==="te" ? theme.te : theme.en}
+                </h2>
+                <div className="flex-1 h-px bg-black/5"></div>
+              </div>
+              <div className="row g-3">
+                {groups[branchKey].map(k => (
+                  <div className="col-12 col-sm-6 col-lg-4" key={k}>
+                    <PathCard lang={lang} pathKey={k} path={PATHS[k]} selected={selectedKey===k} onDetails={setDetailKey} onSelect={onChoose} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {detailKey && <PathDetailModal lang={lang} pathKey={detailKey} onClose={()=>setDetailKey(null)} onChoose={(k)=>{setDetailKey(null); onChoose(k);}} />}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*  LANDING SCREEN                                                        */
+/* ---------------------------------------------------------------------- */
+function Landing({lang, setLang, onStart, onExplore}) {
+  const t = T[lang];
+  return (
+    <div className="min-h-screen bg-night bg-noise grain relative overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none opacity-40">
+        <svg width="100%" height="100%" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+          <path d="M-50 650 C 200 550, 350 750, 600 600 S 950 450, 1250 550" stroke="var(--marigold)" strokeWidth="2" fill="none" opacity="0.35"/>
+          <path d="M-50 500 C 250 400, 400 600, 650 480 S 1000 350, 1250 420" stroke="var(--teal)" strokeWidth="1.5" fill="none" opacity="0.25"/>
+        </svg>
+      </div>
+
+      <nav className="navbar navbar-dark relative z-10 px-3">
+        <div className="container-xl d-flex align-items-center justify-content-between py-3">
+          <Logo dark />
+          <div className="d-flex align-items-center gap-2">
+            <button onClick={() => setLang(lang === "en" ? "te" : "en")}
+              className="btn btn-outline-light btn-sm rounded-pill px-3">
+              {lang === "en" ? "తెలుగు" : "English"}
+            </button>
+            <button onClick={() => onStart("auth")} className="btn btn-outline-light btn-sm rounded-pill px-3 d-none d-sm-inline-block">
+              {t.signIn}
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <main className="relative z-10 container-xl px-3 pt-4 pt-sm-5 pb-5">
+        <div className="fade-in" style={{maxWidth:"640px"}}>
+          <span className="badge rounded-pill text-bg-dark border border-white/10 px-3 py-2 mb-4 d-inline-flex align-items-center gap-2" style={{color:"var(--marigold)"}}>
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--marigold)]"></span>
+            SASI IDEA Lab · 2026
+          </span>
+          <h1 className={"font-display font-extrabold text-white display-5 lh-sm mb-4 " + (lang === "te" ? "font-te" : "")}>
+            {t.heroTitle}
+          </h1>
+          <p className={"text-white-50 fs-5 lh-base mb-4 " + (lang === "te" ? "font-te" : "")}>
+            {t.heroSub}
+          </p>
+
+          <div className="d-flex flex-wrap align-items-center gap-3 mb-4">
+            <button onClick={() => onStart("auth")}
+              className="btn btn-lg rounded-pill fw-bold px-4 py-3 pulse-ring transition-transform hover:scale-[1.02]"
+              style={{background:"var(--marigold)", color:"var(--night)"}}>
+              {t.getStarted}
+            </button>
+            <button onClick={() => onStart("auth")} className="btn btn-outline-light btn-lg rounded-pill d-sm-none px-4 py-3">
+              {t.signIn}
+            </button>
+          </div>
+
+          <button onClick={onExplore} className="btn btn-dark border border-white/10 w-100 text-start d-flex align-items-center gap-3 rounded-4 px-4 py-3 mb-5">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{background:"rgba(31,122,108,0.25)"}}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6M4 6c4 0 6 8 4 12M20 6c-4 0-6 8-4 12" stroke="var(--marigold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
+            <div>
+              <div className={"text-white fw-semibold " + (lang==="te"?"font-te":"")}>{t.exploreCta}</div>
+              <div className={"text-white-50 small " + (lang==="te"?"font-te":"")}>{t.exploreCtaSub}</div>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="ms-auto text-white-50 flex-shrink-0"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+
+          <div className="row g-3">
+            {[t.heroPoint1, t.heroPoint2, t.heroPoint3].map((p, i) => (
+              <div key={i} className="col-12 col-sm-4">
+                <div className="card bg-dark border border-white/10 h-100 rounded-4">
+                  <div className="card-body d-flex align-items-start gap-2 text-white-50 small">
+                    <span className="mt-0.5 text-[var(--teal)]">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </span>
+                    <span className={lang === "te" ? "font-te" : ""}>{p}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </main>
+
+      <footer className="relative z-10 container-xl px-3 pb-4 text-white-50 small">
+        {t.trust}
+      </footer>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*  AUTH SCREEN                                                           */
+/* ---------------------------------------------------------------------- */
+function Auth({lang, onDone, onBack}) {
+  const t = T[lang];
+  const [step, setStep] = useState("phone");
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
+
+  return (
+    <div className="min-h-screen bg-[var(--parchment)] flex items-center justify-center px-5 py-10">
+      <div className="w-full max-w-sm fade-in">
+        <div className="flex justify-between items-center mb-8">
+          <button onClick={onBack} className="text-sm font-semibold text-[var(--muted)] flex items-center gap-1">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            {t.back}
+          </button>
+          <Logo />
+        </div>
+
+        <div className="bg-white rounded-3xl border border-black/5 shadow-[0_8px_30px_rgba(0,0,0,0.06)] p-7">
+          {step === "phone" ? (
+            <React.Fragment>
+              <h2 className={"font-display font-bold text-2xl mb-1.5 " + (lang==="te"?"font-te":"")}>{t.authTitle}</h2>
+              <p className={"text-sm text-[var(--muted)] mb-6 " + (lang==="te"?"font-te":"")}>{t.authSub}</p>
+              <label className={"block text-xs font-semibold text-[var(--muted)] mb-1.5 " + (lang==="te"?"font-te":"")}>{t.phoneLabel}</label>
+              <div className="flex items-center gap-2 border border-black/10 rounded-xl px-3 py-3 mb-6 focus-within:border-[var(--teal)]">
+                <span className="text-sm text-[var(--muted)] font-medium">+91</span>
+                <input value={phone} onChange={e=>setPhone(e.target.value.replace(/\D/g,'').slice(0,10))}
+                  placeholder={t.phonePlaceholder} className="form-control border-0 shadow-none flex-1 text-sm bg-transparent" style={{padding:0}} />
+              </div>
+              <button disabled={phone.length!==10} onClick={()=>setStep("otp")}
+                className="btn w-full py-3.5 rounded-xl font-bold text-white disabled:opacity-40 transition-opacity"
+                style={{background:"var(--teal)"}}>
+                {t.sendOtp}
+              </button>
+            </React.Fragment>
+          ) : (
+            <React.Fragment>
+              <h2 className={"font-display font-bold text-2xl mb-1.5 " + (lang==="te"?"font-te":"")}>{t.otpLabel}</h2>
+              <p className="text-sm text-[var(--muted)] mb-1">{t.otpSub} <span className="font-semibold text-[var(--ink)]">+91 {phone}</span></p>
+              <p className="text-xs text-[var(--muted)] mb-6 italic">{t.otpHint}</p>
+              <input value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,'').slice(0,6))}
+                placeholder="••••••" maxLength={6}
+                className="form-control w-full text-center tracking-[0.5em] text-xl font-bold border border-black/10 rounded-xl px-3 py-3.5 mb-6 focus:border-[var(--teal)]" />
+              <button disabled={otp.length!==6} onClick={onDone}
+                className="btn w-full py-3.5 rounded-xl font-bold text-white disabled:opacity-40 transition-opacity"
+                style={{background:"var(--teal)"}}>
+                {t.verify}
+              </button>
+            </React.Fragment>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*  ONBOARDING SCREEN                                                     */
+/* ---------------------------------------------------------------------- */
+function Onboarding({lang, initialPathKey, onDone}) {
+  const t = T[lang];
+  const [step, setStep] = useState(0);
+  const [name, setName] = useState("");
+  const [pathKey, setPathKey] = useState(initialPathKey || null);
+  const [detailKey, setDetailKey] = useState(null);
+  const [level, setLevel] = useState(null);
+  const [hours, setHours] = useState(6);
+
+  const levels = [
+    {key:"beginner", label:t.levelBeginner},
+    {key:"intermediate", label:t.levelIntermediate},
+    {key:"advanced", label:t.levelAdvanced},
+  ];
+
+  const steps = [
+    { valid: name.trim().length>0 },
+    { valid: !!pathKey },
+    { valid: !!level },
+    { valid: true },
+  ];
+
+  const next = () => {
+    if (step < 3) setStep(step+1);
+    else onDone({name, pathKey, level, hours});
+  };
+
+  // Fix: selecting a path card must give instant feedback AND move the
+  // student straight into the next step, instead of silently updating
+  // state with no visible response (that was the "not working" bug).
+  const choosePathAndAdvance = (k) => {
+    setPathKey(k);
+    setTimeout(() => setStep(2), 450);
+  };
+
+  return (
+    <div className="min-h-screen bg-[var(--parchment)] px-5 py-8 sm:py-12">
+      <div className={"mx-auto " + (step===1 ? "max-w-4xl" : "max-w-xl")}>
+        <div className="flex items-center justify-between mb-8">
+          <Logo />
+          <span className="text-xs font-semibold text-[var(--muted)]">{t.obStep} {step+1}/4</span>
+        </div>
+
+        <div className="progress mb-8" style={{height:"6px", borderRadius:"999px", background:"rgba(0,0,0,0.05)"}}>
+          <div className="progress-bar" role="progressbar" style={{width:`${(step+1)/4*100}%`, background:"linear-gradient(90deg,var(--marigold),var(--teal))", transition:"width .5s ease"}}
+            aria-valuenow={(step+1)/4*100} aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+
+        <h2 className={"font-display font-bold text-2xl mb-1 " + (lang==="te"?"font-te":"")}>{t.obTitle}</h2>
+        <p className={"text-sm text-[var(--muted)] mb-8 " + (lang==="te"?"font-te":"")}>{t.obSub}</p>
+
+        <div className="fade-in" key={step}>
+          {step === 0 && (
+            <div className="max-w-xl">
+              <label className={"block text-sm font-semibold mb-3 " + (lang==="te"?"font-te":"")}>{t.obNameQ}</label>
+              <input value={name} onChange={e=>setName(e.target.value)} placeholder={t.obNamePlaceholder}
+                className="w-full border border-black/10 rounded-xl px-4 py-3.5 text-base bg-white focus:border-[var(--teal)]" autoFocus />
+            </div>
+          )}
+          {step === 1 && (
+            <div>
+              <label className={"block text-sm font-semibold mb-1 " + (lang==="te"?"font-te":"")}>{t.obCareerQ}</label>
+              <p className={"text-xs text-[var(--muted)] mb-4 " + (lang==="te"?"font-te":"")}>{t.obCareerSub}</p>
+              {pathKey && (
+                <div className="flex items-center gap-2 mb-4 bg-[var(--teal)]/10 border border-[var(--teal)]/25 rounded-xl px-4 py-2.5 fade-in">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="var(--teal-deep)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  <span className={"text-xs font-semibold text-[var(--teal-deep)] " + (lang==="te"?"font-te":"")}>{t.obPathConfirmed}: {lang==="te" ? PATHS[pathKey].title_te : PATHS[pathKey].title_en} — {lang==="te" ? "తదుపరి దశకు వెళ్తోంది…" : "taking you to the next step…"}</span>
+                </div>
+              )}
+              <ExplorePaths lang={lang} embedded selectedKey={pathKey} onChoose={choosePathAndAdvance} onBack={()=>{}} setLang={()=>{}} />
+            </div>
+          )}
+          {step === 2 && (
+            <div className="max-w-xl">
+              <label className={"block text-sm font-semibold mb-3 " + (lang==="te"?"font-te":"")}>{t.obLevelQ}</label>
+              <div className="flex flex-col gap-3">
+                {levels.map(l => (
+                  <button key={l.key} onClick={()=>setLevel(l.key)}
+                    className={"text-left p-4 rounded-xl border-2 transition-all " + (level===l.key ? "border-[var(--teal)] bg-[var(--teal)]/5" : "border-black/10 bg-white hover:border-black/20")}>
+                    <span className={"font-semibold text-sm " + (lang==="te"?"font-te":"")}>{l.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {step === 3 && (
+            <div className="max-w-xl">
+              <label className={"block text-sm font-semibold mb-1 " + (lang==="te"?"font-te":"")}>{t.obHoursQ}</label>
+              <p className={"text-xs text-[var(--muted)] mb-5 " + (lang==="te"?"font-te":"")}>{t.obHoursSub}</p>
+              <div className="bg-white border border-black/10 rounded-xl p-5">
+                <div className="text-center mb-4">
+                  <span className="font-display font-extrabold text-4xl" style={{color:"var(--marigold-deep)"}}>{hours}</span>
+                  <span className="text-sm text-[var(--muted)] ml-2">{t.weekHours}</span>
+                </div>
+                <input type="range" min="2" max="20" value={hours} onChange={e=>setHours(Number(e.target.value))}
+                  className="form-range w-full accent-[var(--teal)]" />
+                <div className="flex justify-between text-xs text-[var(--muted)] mt-1"><span>2</span><span>20</span></div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className={step===1 ? "max-w-4xl" : "max-w-xl"}>
+          <button disabled={!steps[step].valid} onClick={next}
+            className="btn w-full mt-8 py-3.5 rounded-xl font-bold text-white disabled:opacity-40 transition-opacity"
+            style={{background:"var(--teal)"}}>
+            {step === 3 ? t.finishBtn : t.continueBtn}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*  ROADMAP PATH (signature visual)                                       */
+/* ---------------------------------------------------------------------- */
+function RoadmapPath({lang, nodes, onOpen}) {
+  const t = T[lang];
+  return (
+    <div className="relative pl-2">
+      <div className="relative">
+        <div className="absolute left-[27px] top-2 bottom-2 w-[3px] rounded-full" style={{background:"repeating-linear-gradient(180deg, var(--marigold) 0 8px, transparent 8px 14px)"}}></div>
+        <div className="flex flex-col gap-3">
+          {nodes.map((n, idx) => {
+            const done = n.status === "done";
+            const locked = n.status === "locked";
+            const title = lang === "te" ? n.title_te : n.title_en;
+            return (
+              <div key={n.id} className="relative flex items-start gap-4 fade-in" style={{animationDelay:`${idx*40}ms`}}>
+                <div className={"relative z-10 mt-1 w-[58px] h-[58px] rounded-2xl flex items-center justify-center flex-shrink-0 border-2 transition-all "
+                  + (done ? "bg-[var(--teal)] border-[var(--teal)]" : locked ? "bg-white border-black/10" : "bg-white border-[var(--marigold)] path-glow")}>
+                  {done ? (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="white" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  ) : locked ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-[var(--muted)]"><rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="1.8"/><path d="M8 11V8a4 4 0 018 0v3" stroke="currentColor" strokeWidth="1.8"/></svg>
+                  ) : (
+                    <span className="font-display font-extrabold text-lg" style={{color:"var(--marigold-deep)"}}>{idx+1}</span>
+                  )}
+                </div>
+
+                <button onClick={()=>!locked && onOpen(n)} disabled={locked}
+                  className={"flex-1 text-left rounded-2xl border p-4 transition-all mb-1 "
+                    + (locked ? "bg-black/[0.02] border-black/5 cursor-not-allowed" : done ? "bg-[var(--teal)]/[0.06] border-[var(--teal)]/20 hover:border-[var(--teal)]/40" : "bg-white border-black/10 hover:border-[var(--marigold)] hover:shadow-md")}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      {n.remedial && (
+                        <span className={"inline-block text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full mb-1.5 " + (lang==="te"?"font-te":"")} style={{background:"rgba(226,87,76,0.12)", color:"var(--coral)"}}>
+                          {t.remedialTag}
+                        </span>
+                      )}
+                      <h3 className={"font-display font-bold text-[15px] leading-snug " + (locked?"text-[var(--muted)]":"text-[var(--ink)]") + (lang==="te"?" font-te":"")}>{title}</h3>
+                    </div>
+                    <span className={"badge text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full flex-shrink-0 "
+                      + (done ? "bg-[var(--teal)]/15 text-[var(--teal-deep)]" : locked ? "bg-black/5 text-[var(--muted)]" : "bg-[var(--marigold)]/15 text-[var(--marigold-deep)]") + (lang==="te"?" font-te":"")}>
+                      {done ? t.statusDone : locked ? t.statusLocked : t.statusAvailable}
+                    </span>
+                  </div>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*  SUGGESTED LEARNING WEBSITES                                           */
+/*  Builds a short list of well-known learning platforms deep-linked to   */
+/*  this exact topic, so a student always has more than one place to go. */
+/* ---------------------------------------------------------------------- */
+function suggestedResources(node, lang) {
+  if (!node) return [];
+  const title = lang === "te" ? node.title_te : node.title_en;
+  const q = encodeURIComponent(node.title_en); // keep search queries in English for best hit-rate
+  const list = [];
+  if (node.type === "external" && node.link) {
+    list.push({ name_en: "Recommended lesson", name_te: "సిఫార్సు చేయబడిన పాఠం", url: node.link, primary: true });
+  }
+  list.push(
+    { name_en: "GeeksforGeeks", name_te: "GeeksforGeeks", url: `https://www.geeksforgeeks.org/?s=${q}` },
+    { name_en: "YouTube tutorials", name_te: "YouTube ట్యుటోరియల్స్", url: `https://www.youtube.com/results?search_query=${q}+tutorial` },
+    { name_en: "NPTEL / Swayam", name_te: "NPTEL / Swayam", url: `https://nptel.ac.in/course.html` },
+    { name_en: "freeCodeCamp", name_te: "freeCodeCamp", url: `https://www.freecodecamp.org/news/search/?query=${q}` },
+  );
+  return list;
+}
+
+/* ---------------------------------------------------------------------- */
+/*  TOPIC MODAL                                                           */
+/* ---------------------------------------------------------------------- */
+function TopicModal({lang, node, onClose, onComplete, onVisit, visited}) {
+  const t = T[lang];
+  if (!node) return null;
+  const title = lang === "te" ? node.title_te : node.title_en;
+  const desc = lang === "te" ? node.desc_te : node.desc_en;
+  const done = node.status === "done";
+  const wasVisited = !!(visited && visited[node.id]);
+  const resources = suggestedResources(node, lang);
+
+  const openLink = (url) => {
+    onVisit && onVisit(node.id);
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-0 sm:px-5" onClick={onClose}>
+      <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 fade-in scrollbar-none" style={{maxHeight:"90vh", overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        {node.remedial && (
+          <span className="badge inline-block text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full mb-2" style={{background:"rgba(226,87,76,0.12)", color:"var(--coral)"}}>
+            {t.remedialTag}
+          </span>
+        )}
+        <h3 className={"font-display font-bold text-xl mb-2 " + (lang==="te"?"font-te":"")}>{title}</h3>
+        <p className={"text-sm text-[var(--muted)] leading-relaxed mb-4 " + (lang==="te"?"font-te":"")}>{desc}</p>
+
+        {node.type === "external" && (
+          <div className="mb-4 bg-black/[0.03] rounded-xl p-3 flex items-start gap-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-[var(--muted)] mt-0.5 flex-shrink-0"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6"/><path d="M12 8v5m0 3h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+            <p className={"text-xs text-[var(--muted)] " + (lang==="te"?"font-te":"")}>{t.resourceExternalNote}</p>
+          </div>
+        )}
+
+        {node.type === "external" && (
+          <button onClick={() => openLink(node.link)}
+            className="btn w-full text-center py-3 rounded-xl font-bold text-white text-sm mb-2.5" style={{background:"var(--night)"}}>
+            {t.openResource} ↗
+          </button>
+        )}
+
+        {wasVisited && (
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold mb-3" style={{color:"var(--teal-deep)"}}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="var(--teal-deep)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <span className={lang==="te"?"font-te":""}>{lang==="te" ? "మీరు ఈ టాపిక్ కోసం ఒక వనరు తెరిచారు" : "You've opened a resource for this topic"}</span>
+          </div>
+        )}
+
+        <div className="mb-5">
+          <div className={"text-[10px] font-bold uppercase tracking-wide text-[var(--muted)] mb-2 " + (lang==="te"?"font-te":"")}>
+            {lang==="te" ? "సూచించిన లెర్నింగ్ వెబ్‌సైట్‌లు" : "Suggested learning websites"}
+          </div>
+          <div className="list-group">
+            {resources.map((r, i) => (
+              <button key={i} onClick={()=>openLink(r.url)}
+                className="list-group-item list-group-item-action d-flex align-items-center justify-content-between text-sm py-2.5 px-3 mb-1.5 rounded-xl border border-black/10">
+                <span className={"font-medium " + (lang==="te"?"font-te":"")}>{lang==="te" ? r.name_te : r.name_en}</span>
+                <span className="text-[var(--muted)]">↗</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2.5">
+          <button onClick={() => onComplete(node.id)} disabled={done}
+            className="btn py-3 rounded-xl font-bold text-sm disabled:opacity-60"
+            style={{background: done ? "rgba(31,122,108,0.12)" : "var(--teal)", color: done ? "var(--teal-deep)" : "white"}}>
+            {done ? t.completed : t.markComplete}
+          </button>
+          <button onClick={onClose} className="btn py-2 rounded-xl font-semibold text-sm text-[var(--muted)]">
+            {t.closeModal}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*  QUIZ MODAL                                                            */
+/* ---------------------------------------------------------------------- */
+function QuizModal({lang, questions, onClose, onFinish, currentNodeTitle}) {
+  const t = T[lang];
+  const [answers, setAnswers] = useState({});
+  const [phase, setPhase] = useState("quiz");
+  const [remedialText, setRemedialText] = useState("");
+
+  const mcqs = questions.filter(q => q.options);
+
+  const submit = async () => {
+    let correct = 0;
+    mcqs.forEach((q, i) => { if (answers[i] === q.answer) correct++; });
+    const pct = mcqs.length ? correct / mcqs.length : 1;
+    if (pct >= 0.6) {
+      setPhase("result-pass");
+    } else {
+      setPhase("generating");
+      const sys = lang === "te"
+        ? "మీరు గ్రామీణ ఆంధ్రప్రదేశ్ ఇంజనీరింగ్ విద్యార్థుల కోసం ఒక ప్రశాంతమైన, ప్రోత్సాహకరమైన AI మెంటార్. విద్యార్థి ఒక క్విజ్‌లో విఫలమయ్యారు. తెలుగులో, 4-5 వాక్యాలలో, సరళంగా, తీర్పు తీర్చకుండా, ఒక చిన్న క్యాచ్-అప్ వివరణ ఇవ్వండి."
+        : "You are a calm, encouraging AI mentor for rural Andhra Pradesh engineering students. The student just failed a short quiz on a topic. In plain English, in 4-5 sentences, give a short, non-judgmental catch-up explanation of the core idea they likely missed, ending with one word of encouragement.";
+      const userMsg = `Topic: ${currentNodeTitle}. Give a short remedial explanation.`;
+      const res = await askClaude(sys, userMsg);
+      setRemedialText(res || (lang === "te" ? "పర్వాలేదు, మళ్లీ ప్రయత్నిద్దాం. ఈ టాపిక్‌ను చిన్న భాగాలుగా విడగొట్టి మళ్లీ చూద్దాం." : "No worries — let's break this topic into smaller pieces and go through it again, one idea at a time."));
+      setPhase("result-fail");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-0 sm:px-5">
+      <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 max-h-[88vh] overflow-y-auto scrollbar-none fade-in">
+        {phase === "quiz" && (
+          <React.Fragment>
+            <h3 className={"font-display font-bold text-xl mb-1 " + (lang==="te"?"font-te":"")}>{t.quizTitle}</h3>
+            <p className={"text-sm text-[var(--muted)] mb-6 " + (lang==="te"?"font-te":"")}>{t.quizSub}</p>
+            {mcqs.length === 0 ? (
+              <p className={"text-sm text-[var(--muted)] mb-6 " + (lang==="te"?"font-te":"")}>
+                {lang==="te" ? "ఈ టాపిక్‌కు క్విజ్ లేదు — నేరుగా కొనసాగించవచ్చు." : "No quiz questions for this topic yet — you can continue directly."}
+              </p>
+            ) : (
+              <div className="flex flex-col gap-5 mb-6">
+                {mcqs.map((q, i) => (
+                  <div key={i}>
+                    <p className={"font-semibold text-sm mb-2.5 " + (lang==="te"?"font-te":"")}>{i+1}. {lang==="te" ? q.q_te : q.q_en}</p>
+                    <div className="flex flex-col gap-2">
+                      {q.options.map((opt, oi) => (
+                        <button key={oi} onClick={() => setAnswers({...answers, [i]: oi})}
+                          className={"text-left px-3.5 py-2.5 rounded-lg border text-sm transition-all " + (answers[i]===oi ? "border-[var(--teal)] bg-[var(--teal)]/5 font-semibold" : "border-black/10 hover:border-black/20")}>
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button onClick={submit} disabled={Object.keys(answers).length < mcqs.length}
+              className="w-full py-3.5 rounded-xl font-bold text-white disabled:opacity-40" style={{background:"var(--teal)"}}>
+              {t.submitQuiz}
+            </button>
+          </React.Fragment>
+        )}
+
+        {phase === "generating" && (
+          <div className="py-10 text-center">
+            <div className="w-10 h-10 border-4 border-[var(--marigold)]/30 border-t-[var(--marigold)] rounded-full animate-spin mx-auto mb-5"></div>
+            <p className={"text-sm font-semibold text-[var(--muted)] " + (lang==="te"?"font-te":"")}>{t.generatingHelp}</p>
+          </div>
+        )}
+
+        {phase === "result-pass" && (
+          <div className="py-4 text-center">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{background:"rgba(31,122,108,0.12)"}}>
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="var(--teal)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
+            <h3 className={"font-display font-bold text-xl mb-2 " + (lang==="te"?"font-te":"")}>{t.quizResultPassTitle}</h3>
+            <p className={"text-sm text-[var(--muted)] mb-7 " + (lang==="te"?"font-te":"")}>{t.quizResultPassSub}</p>
+            <button onClick={() => onFinish(true, null)} className="w-full py-3.5 rounded-xl font-bold text-white" style={{background:"var(--teal)"}}>
+              {t.continueDash}
+            </button>
+          </div>
+        )}
+
+        {phase === "result-fail" && (
+          <div className="py-2">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{background:"rgba(232,163,61,0.14)"}}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 8v5m0 3h.01" stroke="var(--marigold-deep)" strokeWidth="2.4" strokeLinecap="round"/><circle cx="12" cy="12" r="9" stroke="var(--marigold-deep)" strokeWidth="1.8"/></svg>
+            </div>
+            <h3 className={"font-display font-bold text-xl mb-2 text-center " + (lang==="te"?"font-te":"")}>{t.quizResultFailTitle}</h3>
+            <p className={"text-sm text-[var(--muted)] mb-4 text-center " + (lang==="te"?"font-te":"")}>{t.quizResultFailSub}</p>
+            <div className="bg-black/[0.03] rounded-xl p-4 mb-6">
+              <p className={"text-sm leading-relaxed " + (lang==="te"?"font-te":"")}>{remedialText}</p>
+            </div>
+            <button onClick={() => onFinish(false, remedialText)} className="w-full py-3.5 rounded-xl font-bold text-white" style={{background:"var(--teal)"}}>
+              {t.continueDash}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*  CHATBOT (omnipresent FAB + panel)                                     */
+/* ---------------------------------------------------------------------- */
+function Chatbot({lang, user, currentNode, lastScore, history, setHistory}) {
+  const t = T[lang];
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [micSupported, setMicSupported] = useState(true);
+  const recognitionRef = useRef(null);
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { setMicSupported(false); return; }
+    const rec = new SR();
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      setInput(prev => (prev ? prev + " " : "") + transcript);
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recognitionRef.current = rec;
+  }, [lang]);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [history, open, loading]);
+
+  const toggleMic = () => {
+    if (!micSupported || !recognitionRef.current) return;
+    if (listening) {
+      recognitionRef.current.stop();
+      setListening(false);
+    } else {
+      recognitionRef.current.lang = lang === "te" ? "te-IN" : "en-IN";
+      recognitionRef.current.start();
+      setListening(true);
+    }
+  };
+
+  const send = async () => {
+    if (!input.trim() || loading) return;
+    const userMsg = input.trim();
+    const newHistory = [...history, {role:"user", text:userMsg}];
+    setHistory(newHistory);
+    setInput("");
+    setLoading(true);
+
+    const nodeTitle = currentNode ? (lang==="te" ? currentNode.title_te : currentNode.title_en) : "—";
+    const sys = (lang === "te"
+      ? `మీరు 'స్కై రూట్' — గ్రామీణ ఆంధ్రప్రదేశ్ ఇంజనీరింగ్ విద్యార్థుల కోసం ఒక వెచ్చని, ఓపికగల AI మెంటార్. విద్యార్థి పేరు ${user.name}. వారి లక్ష్యం: ${user.careerLabel}. వారి స్థాయి: ${user.level}. ప్రస్తుతం చదువుతున్న టాపిక్: ${nodeTitle}. చివరి క్విజ్ స్కోరు: ${lastScore==null?"లేదు":Math.round(lastScore*100)+"%"}. తెలుగు, ఇంగ్లీష్ లేదా రెండూ కలిపిన (Tanglish) ప్రశ్నలకు సహజంగా సమాధానం ఇవ్వండి. చిన్నగా, స్పష్టంగా, ప్రోత్సాహకరంగా సమాధానం ఇవ్వండి — 5-6 వాక్యాల లోపు.`
+      : `You are 'Sky Route' — a warm, patient AI mentor for a rural Andhra Pradesh engineering student named ${user.name}. Their goal: ${user.careerLabel}. Their level: ${user.level}. They are currently on the topic: "${nodeTitle}". Last quiz score: ${lastScore==null?"not taken yet":Math.round(lastScore*100)+"%"}. Answer naturally even if they mix Telugu and English (Tanglish). Keep answers short, clear, and encouraging — under 6 sentences. Never make the student feel behind or stupid.`);
+
+    const res = await askClaude(sys, userMsg);
+    const replyText = res || (lang==="te" ? "క్షమించండి, ఇప్పుడు కనెక్ట్ కాలేకపోతున్నాను. దయచేసి మళ్లీ ప్రయత్నించండి." : "Sorry, I couldn't connect just now. Please try again in a moment.");
+    setHistory([...newHistory, {role:"assistant", text: replyText}]);
+    setLoading(false);
+  };
+
+  const nodeTitle = currentNode ? (lang==="te" ? currentNode.title_te : currentNode.title_en) : null;
+
+  return (
+    <React.Fragment>
+      <button onClick={() => setOpen(!open)}
+        className="fixed bottom-5 right-5 z-40 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center pulse-ring transition-transform hover:scale-105"
+        style={{background:"linear-gradient(135deg,var(--marigold),var(--teal))"}}>
+        {open ? (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="white" strokeWidth="2.4" strokeLinecap="round"/></svg>
+        ) : (
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M4 4h16v11H8l-4 4V4z" stroke="white" strokeWidth="2" strokeLinejoin="round"/><circle cx="9" cy="9.5" r="1" fill="white"/><circle cx="12" cy="9.5" r="1" fill="white"/><circle cx="15" cy="9.5" r="1" fill="white"/></svg>
+        )}
+      </button>
+
+      {open && (
+        <div className="fixed bottom-24 right-5 left-5 sm:left-auto z-40 sm:w-96 h-[68vh] sm:h-[560px] bg-white rounded-3xl shadow-2xl border border-black/5 flex flex-col overflow-hidden fade-in">
+          <div className="px-5 py-4 flex items-center gap-3 border-b border-black/5" style={{background:"var(--night)"}}>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{background:"var(--marigold)"}}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 18c4-8 8-8 16-14M4 18c2-2 4-3 6-3M20 4c-1 3-2 5-3 7" stroke="var(--night)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className={"text-white font-display font-bold text-sm " + (lang==="te"?"font-te":"")}>{t.chatTitle}</div>
+              {nodeTitle && <div className="text-white/50 text-[11px] truncate">{t.chatContext} {nodeTitle}</div>}
+            </div>
+          </div>
+
+          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3 bg-[var(--parchment)]">
+            {history.length === 0 && (
+              <div className={"text-center text-xs text-[var(--muted)] mt-8 px-6 " + (lang==="te"?"font-te":"")}>{t.chatEmpty}</div>
+            )}
+            {history.map((m, i) => (
+              <div key={i} className={"max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed " + (m.role==="user" ? "self-end text-white rounded-br-md" : "self-start bg-white border border-black/5 rounded-bl-md") + (lang==="te"?" font-te":"")}
+                style={m.role==="user" ? {background:"var(--teal)"} : {}}>
+                {m.text}
+              </div>
+            ))}
+            {loading && (
+              <div className="self-start bg-white border border-black/5 rounded-2xl rounded-bl-md px-3.5 py-2.5 text-xs text-[var(--muted)]">{t.thinking}</div>
+            )}
+          </div>
+
+          {!micSupported && (
+            <div className="px-4 py-1.5 text-[10px] text-[var(--muted)] bg-black/[0.02] border-t border-black/5">{t.micUnsupported}</div>
+          )}
+          {listening && (
+            <div className="px-4 py-1.5 text-[10px] font-semibold text-[var(--coral)] bg-[var(--coral)]/5 border-t border-black/5">{t.listening}</div>
+          )}
+
+          <div className="p-3 border-t border-black/5 flex items-center gap-2 bg-white">
+            <button onClick={toggleMic} disabled={!micSupported}
+              className={"w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors disabled:opacity-30 " + (listening ? "mic-active" : "")}
+              style={{background: listening ? "var(--coral)" : "rgba(31,122,108,0.1)"}}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+                <path d="M12 15a3 3 0 003-3V6a3 3 0 00-6 0v6a3 3 0 003 3z" stroke={listening?"white":"var(--teal)"} strokeWidth="1.8"/>
+                <path d="M19 11a7 7 0 01-14 0M12 18v3" stroke={listening?"white":"var(--teal)"} strokeWidth="1.8" strokeLinecap="round"/>
+              </svg>
+            </button>
+            <input value={input} onChange={e=>setInput(e.target.value)}
+              onKeyDown={e => { if (e.key==="Enter") send(); }}
+              placeholder={t.chatPlaceholder}
+              className={"flex-1 text-sm bg-black/[0.03] rounded-full px-4 py-2.5 " + (lang==="te"?"font-te":"")} />
+            <button onClick={send} disabled={!input.trim()||loading}
+              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 disabled:opacity-30" style={{background:"var(--marigold)"}}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 12l16-8-6 8 6 8-16-8z" stroke="var(--night)" strokeWidth="1.6" strokeLinejoin="round" fill="var(--night)"/></svg>
+            </button>
+          </div>
+        </div>
+      )}
+    </React.Fragment>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*  DASHBOARD                                                             */
+/* ---------------------------------------------------------------------- */
+function Dashboard({lang, setLang, user, roadmap, setRoadmap, onSignOut, onExplore}) {
+  const t = T[lang];
+  const [activeNode, setActiveNode] = useState(null);
+  const [quizOpen, setQuizOpen] = useState(false);
+  const [lastScore, setLastScore] = useState(null);
+  const [chatHistory, setChatHistory] = useState([]);
+  const [visited, setVisited] = useState({});
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await safeStorage.get("skyroute:visited");
+        if (saved && saved.value) setVisited(JSON.parse(saved.value));
+      } catch (e) { /* nothing tracked yet */ }
+    })();
+  }, []);
+
+  const trackVisit = (nodeId) => {
+    setVisited(prev => {
+      const next = {...prev, [nodeId]: true};
+      safeStorage.set("skyroute:visited", JSON.stringify(next)).catch(()=>{});
+      return next;
+    });
+  };
+
+  const doneCount = roadmap.filter(n => n.status === "done").length;
+  const pct = Math.round((doneCount / roadmap.length) * 100);
+  const currentNode = roadmap.find(n => n.status === "available") || roadmap.find(n=>n.status==="done") || roadmap[0];
+
+  const markComplete = (id) => {
+    setRoadmap(prev => {
+      const idx = prev.findIndex(n => n.id === id);
+      const next = prev.map((n,i) => {
+        if (n.id === id) return {...n, status:"done"};
+        if (i === idx+1 && n.status === "locked") return {...n, status:"available"};
+        return n;
+      });
+      return next;
+    });
+    setActiveNode(prev => prev ? {...prev, status:"done"} : prev);
+  };
+
+  const quizAvailable = doneCount > 0 && doneCount % 2 === 0 && doneCount < roadmap.length;
+  const quizQuestions = useMemo(() => {
+    if (!currentNode) return QUIZ_BANK.default;
+    return QUIZ_BANK[currentNode.id] || QUIZ_BANK.default;
+  }, [currentNode]);
+
+  const handleQuizFinish = (passed, remedialText) => {
+    setLastScore(passed ? 1 : 0.3);
+    if (!passed) {
+      setRoadmap(prev => {
+        const idx = prev.findIndex(n => n.status === "available");
+        const insertAt = idx === -1 ? prev.length : idx;
+        const remedialNode = {
+          id: "remedial-" + Date.now(),
+          title_en: "Catch-up: " + (currentNode ? currentNode.title_en : ""),
+          title_te: "క్యాచ్-అప్: " + (currentNode ? currentNode.title_te : ""),
+          type: "internal",
+          desc_en: remedialText || "A short focused lesson to close the gap before you move forward.",
+          desc_te: remedialText || "ముందుకు వెళ్లే ముందు గ్యాప్‌ను పూరించడానికి ఒక చిన్న ఫోకస్డ్ పాఠం.",
+          status: "available",
+          remedial: true,
+        };
+        const copy = [...prev];
+        copy.splice(insertAt, 0, remedialNode);
+        return copy;
+      });
+    }
+    setQuizOpen(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-[var(--parchment)] pb-32">
+      <nav className="navbar navbar-light bg-white sticky-top shadow-sm border-bottom">
+        <div className="container-md d-flex align-items-center justify-content-between gap-2 py-2">
+          <Logo />
+          <div className="d-flex align-items-center gap-1">
+            <button onClick={onExplore} className="btn btn-light btn-sm rounded-pill d-none d-sm-flex align-items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              {t.explorePaths}
+            </button>
+            <LangSwitch lang={lang} setLang={setLang} />
+            <button onClick={onSignOut} className="btn btn-light btn-sm rounded-pill">
+              {t.signOut}
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <main className="container-md px-3 pt-4">
+        <div className="fade-in mb-4">
+          <h1 className={"font-display font-extrabold display-6 mb-1 " + (lang==="te"?"font-te":"")}>{t.dashGreeting}, {user.name} 👋</h1>
+          <p className={"text-sm text-[var(--muted)] " + (lang==="te"?"font-te":"")}>{t.dashSub}</p>
+        </div>
+
+        <div className="row g-3 mb-3">
+          <div className="col-6">
+            <div className="bg-white rounded-2xl border border-black/5 p-4 h-100">
+              <div className={"text-xs font-semibold text-[var(--muted)] mb-1.5 " + (lang==="te"?"font-te":"")}>{t.progress}</div>
+              <div className="flex items-end gap-2">
+                <span className="font-display font-extrabold text-3xl" style={{color:"var(--teal-deep)"}}>{pct}%</span>
+                <span className={"text-xs text-[var(--muted)] mb-1 " + (lang==="te"?"font-te":"")}>{doneCount}/{roadmap.length} {t.nodesDone}</span>
+              </div>
+              <div className="progress mt-2.5" style={{height:"8px", borderRadius:"999px", background:"rgba(0,0,0,0.05)"}}>
+                <div className="progress-bar" role="progressbar" style={{width:`${pct}%`, background:"var(--teal)", transition:"width .5s ease"}}
+                  aria-valuenow={pct} aria-valuemin="0" aria-valuemax="100"></div>
+              </div>
+            </div>
+          </div>
+          <div className="col-6">
+            <div className="bg-white rounded-2xl border border-black/5 p-4 h-100 flex flex-col justify-between">
+              <div className={"text-xs font-semibold text-[var(--muted)] mb-1.5 " + (lang==="te"?"font-te":"")}>{user.careerLabel}</div>
+              <div className="badge d-inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-full bg-black/5 w-fit">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="var(--teal)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <span className={lang==="te"?"font-te":""}>{t.offlineBadge}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {quizAvailable && (
+          <button onClick={() => setQuizOpen(true)} className="btn w-full mb-6 text-left rounded-2xl p-4 flex items-center gap-4 border transition-transform hover:scale-[1.01]"
+            style={{background:"linear-gradient(135deg, rgba(232,163,61,0.12), rgba(31,122,108,0.10))", borderColor:"rgba(232,163,61,0.3)"}}>
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{background:"var(--marigold)"}}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4M2 12a10 10 0 1010-10" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
+            <div className="flex-1">
+              <div className={"font-display font-bold text-sm " + (lang==="te"?"font-te":"")}>{t.weeklyCheck}</div>
+              <div className={"text-xs text-[var(--muted)] " + (lang==="te"?"font-te":"")}>{t.weeklyCheckSub}</div>
+            </div>
+            <span className="badge text-xs font-bold px-3 py-2 rounded-full text-white flex-shrink-0" style={{background:"var(--marigold-deep)"}}>{t.startQuiz}</span>
+          </button>
+        )}
+
+        <div className="flex items-center justify-between mb-4">
+          <h2 className={"font-display font-bold text-lg " + (lang==="te"?"font-te":"")}>{t.yourPath}</h2>
+          <button onClick={onExplore} className="sm:hidden text-xs font-semibold text-[var(--teal-deep)]">{t.explorePaths}</button>
+        </div>
+        <RoadmapPath lang={lang} nodes={roadmap} onOpen={setActiveNode} />
+
+        <div className={"text-center text-xs text-[var(--muted)] mt-10 mb-2 " + (lang==="te"?"font-te":"")}>{t.footerTag}</div>
+      </main>
+
+      <TopicModal lang={lang} node={activeNode} onClose={()=>setActiveNode(null)} onComplete={(id)=>{markComplete(id); }} onVisit={trackVisit} visited={visited} />
+      {quizOpen && (
+        <QuizModal lang={lang} questions={quizQuestions} currentNodeTitle={currentNode ? (lang==="te"?currentNode.title_te:currentNode.title_en) : ""}
+          onClose={()=>setQuizOpen(false)} onFinish={handleQuizFinish} />
+      )}
+
+      <Chatbot lang={lang} user={user} currentNode={currentNode} lastScore={lastScore} history={chatHistory} setHistory={setChatHistory} />
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*  ROOT APP                                                              */
+/* ---------------------------------------------------------------------- */
+function App() {
+  const [lang, setLang] = useState("en");
+  const [screen, setScreen] = useState("landing"); // landing | explore | auth | onboarding | dashboard
+  const [prevScreen, setPrevScreen] = useState("landing");
+  const [pendingPath, setPendingPath] = useState(null);
+  const [user, setUser] = useState(null);
+  const [roadmap, setRoadmap] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await safeStorage.get("skyroute:session");
+        if (saved && saved.value) {
+          const parsed = JSON.parse(saved.value);
+          setUser(parsed.user);
+          setRoadmap(parsed.roadmap);
+          setLang(parsed.lang || "en");
+          setScreen("dashboard");
+        }
+      } catch (e) { /* no session yet */ }
+      setLoaded(true);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (screen === "dashboard" && user) {
+      safeStorage.set("skyroute:session", JSON.stringify({user, roadmap, lang})).catch(()=>{});
+    }
+  }, [roadmap, lang]);
+
+  const buildRoadmap = (pathKey, level) => {
+    const path = PATHS[pathKey];
+    const skipCount = level === "advanced" ? 2 : level === "intermediate" ? 1 : 0;
+    return path.nodes.map((n, i) => ({
+      ...n,
+      status: i < skipCount ? "done" : i === skipCount ? "available" : "locked",
+    }));
+  };
+
+  const finishOnboarding = ({name, pathKey, level, hours}) => {
+    const path = PATHS[pathKey];
+    const careerLabel = lang === "te" ? path.title_te : path.title_en;
+    const newUser = { name, pathKey, careerLabel, level, hours };
+    const rm = buildRoadmap(pathKey, level);
+    setUser(newUser);
+    setRoadmap(rm);
+    setScreen("dashboard");
+    safeStorage.set("skyroute:session", JSON.stringify({user:newUser, roadmap:rm, lang})).catch(()=>{});
+  };
+
+  const handleChoosePath = (pathKey) => {
+    if (user) {
+      // Logged-in user switching paths from the dashboard
+      const path = PATHS[pathKey];
+      const careerLabel = lang === "te" ? path.title_te : path.title_en;
+      const level = user.level || "beginner";
+      const newUser = {...user, pathKey, careerLabel};
+      const rm = buildRoadmap(pathKey, level);
+      setUser(newUser);
+      setRoadmap(rm);
+      setScreen("dashboard");
+      safeStorage.set("skyroute:session", JSON.stringify({user:newUser, roadmap:rm, lang})).catch(()=>{});
+    } else {
+      setPendingPath(pathKey);
+      setScreen("auth");
+    }
+  };
+
+  const signOut = () => {
+    safeStorage.delete("skyroute:session").catch(()=>{});
+    setUser(null);
+    setRoadmap([]);
+    setPendingPath(null);
+    setScreen("landing");
+  };
+
+  if (!loaded) return null;
+
+  if (screen === "landing") return <Landing lang={lang} setLang={setLang} onStart={setScreen} onExplore={()=>setScreen("explore")} />;
+
+  if (screen === "explore") return (
+    <ExplorePaths lang={lang} setLang={setLang} onChoose={handleChoosePath} onBack={()=>setScreen(user ? "dashboard" : "landing")} />
+  );
+
+  if (screen === "auth") return <Auth lang={lang} onBack={()=>setScreen(pendingPath ? "explore" : "landing")} onDone={()=>setScreen("onboarding")} />;
+
+  if (screen === "onboarding") return <Onboarding lang={lang} initialPathKey={pendingPath} onDone={finishOnboarding} />;
+
+  if (screen === "dashboard" && user) return (
+    <Dashboard lang={lang} setLang={setLang} user={user} roadmap={roadmap} setRoadmap={setRoadmap} onSignOut={signOut} onExplore={()=>setScreen("explore")} />
+  );
+
+  return <Landing lang={lang} setLang={setLang} onStart={setScreen} onExplore={()=>setScreen("explore")} />;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
